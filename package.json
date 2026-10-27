@@ -9,6 +9,9 @@
     "build:macos": "tauri build --bundles app,dmg",
     "build:linux": "tauri build --bundles deb,rpm,appimage",
     "test": "bun test src",
+    "format:ts": "bun fmt --single-quote \"src/**/*.ts\"",
+    "format:css": "bun fmt \"src/**/*.css\"",
+    "format:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "tauri:dev": "tauri dev"
   },
   "dependencies": {

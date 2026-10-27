@@ -90,6 +90,15 @@ const click = async (label: string): Promise<void> => {
   await fixture.whenStable();
 };
 
+const restartApp = async (): Promise<void> => {
+  TestBed.resetTestingModule();
+  terminals.length = 0;
+  TestBed.configureTestingModule({ imports: [AppComponent] });
+  fixture = TestBed.createComponent(AppComponent);
+  fixture.autoDetectChanges();
+  await fixture.whenStable();
+};
+
 test('the application runs without loading ZoneJS', (): void => {
   expect(Reflect.has(globalThis, 'Zone')).toBe(false);
 });
@@ -261,17 +270,55 @@ test('changed settings are saved and restored before the first terminal opens af
   const saved = localStorage.getItem('tiii-terminal-settings');
   expect(saved).not.toBeNull();
   expect(JSON.parse(saved!)).toEqual({ theme: 'Nord', profileId: 'powershell', fontFamily: 'Consolas', fontSize: 16, scale: 125 });
-  TestBed.resetTestingModule();
-  terminals.length = 0;
-  TestBed.configureTestingModule({ imports: [AppComponent] });
-  fixture = TestBed.createComponent(AppComponent);
-  fixture.autoDetectChanges();
-  await fixture.whenStable();
-  expect(fixture.componentInstance.tabs()[0].profileId).toBe('powershell');
+  await restartApp();
+  expect(fixture.componentInstance.tabs()[0].profileId).toBe('pwsh');
+  expect(fixture.componentInstance.selectedProfile()?.id).toBe('powershell');
   expect(fixture.componentInstance.scale()).toBe(125);
   expect(windowActions).toEqual(['zoom', 'zoom']);
   expect(terminals[0].options).toMatchObject({ theme: themes.Nord, fontFamily: '"Consolas"', fontSize: 16 });
   expect(localStorage.getItem('tiii-terminal-settings')).toBe(saved);
+});
+
+test('tabs restore their order, uploaded icons, groups, shell profiles, and active selection after restart', async (): Promise<void> => {
+  await click('New terminal tab');
+  await click('New terminal tab');
+  const app = fixture.componentInstance;
+  const [first, second, third] = app.tabs();
+  app.createGroup(first.id);
+  app.setGroupColor('#75d8b1');
+  await fixture.whenStable();
+  const input = fixture.nativeElement.querySelector('.dialog--group input') as HTMLInputElement;
+  input.value = 'Work';
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  app.groupDialog.nativeElement.close();
+  app.assignGroup(second.id, app.groups()[0].id);
+  app.toggleGroup(app.groups()[0].id);
+  app.openIconEditor(third.id);
+  app.setTabIcon('data:image/png;base64,aWNvbg==');
+  app.moveActiveTab(1);
+  app.activate(app.tabs()[0]);
+  await app.closeTab(second.id);
+  await fixture.whenStable();
+  const saved = localStorage.getItem('tiii-terminal-tabs');
+  const tabs = app.tabs();
+  const groups = app.groups();
+  await restartApp();
+  expect(fixture.componentInstance.tabs()).toEqual(tabs);
+  expect(fixture.componentInstance.groups()).toEqual(groups);
+  expect(fixture.componentInstance.activeId()).toBe(first.id);
+  expect(fixture.nativeElement.querySelectorAll('.tab').length).toBe(2);
+  expect(fixture.nativeElement.querySelector('img.tab__icon').getAttribute('src')).toBe(tabs[1].icon);
+  expect(terminals.length).toBe(2);
+  expect(localStorage.getItem('tiii-terminal-tabs')).toBe(saved);
+});
+
+test('closing the last tab stores an empty layout and the next startup opens one new tab', async (): Promise<void> => {
+  const id = fixture.componentInstance.tabs()[0].id;
+  await fixture.componentInstance.closeTab(id);
+  expect(JSON.parse(localStorage.getItem('tiii-terminal-tabs')!).tabs).toEqual([]);
+  await restartApp();
+  expect(fixture.componentInstance.tabs().length).toBe(1);
+  expect(fixture.componentInstance.tabs()[0].id).not.toBe(id);
 });
 
 test('renamed and recolored groups collapse their inactive tabs', async (): Promise<void> => {

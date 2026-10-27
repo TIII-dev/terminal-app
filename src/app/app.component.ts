@@ -1,4 +1,4 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, PendingTasks, ViewChild, computed, inject, signal } from '@angular/core';
+import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, PendingTasks, ViewChild, computed, effect, inject, signal } from '@angular/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
@@ -10,6 +10,7 @@ import { Terminal } from '@xterm/xterm';
 import { themes } from './app.constants';
 import { OutputEvent, ShellProfile, TabMenu } from './app.types';
 import { parseSettings } from './settings/settings.utils';
+import { parseTerminalSession } from './terminal-session/terminal-session.utils';
 import { tabIcons } from './terminal-tab/terminal-tab.constants';
 import { readTabImage } from './terminal-tab/terminal-tab.image';
 import { TabGroup, TerminalTab } from './terminal-tab/terminal-tab.types';
@@ -51,6 +52,8 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private readonly editingGroupId = signal<string | undefined>(undefined);
   readonly editingGroup = computed((): TabGroup | undefined => this.groups().find((group): boolean => group.id === this.editingGroupId()));
   private nextGroup = 1;
+  private readonly hasRestoredTabs = signal(false);
+  private readonly persistTabs = effect((): void => { if (this.hasRestoredTabs()) this.saveTabs(); });
   private unlisten?: UnlistenFn;
   private readonly appWindow = getCurrentWindow();
   private readonly pendingTasks = inject(PendingTasks);
@@ -58,7 +61,10 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private readonly openingTabs = new Map<string, Promise<void>>();
   private readonly resizeObserver = new ResizeObserver(() => this.instances.get(this.activeId())?.fit.fit());
   readonly minimizeWindow = (): Promise<void> => this.appWindow.minimize();
-  readonly closeWindow = (): Promise<void> => this.appWindow.close();
+  readonly closeWindow = (): Promise<void> => {
+    if (this.hasRestoredTabs()) this.saveTabs();
+    return this.appWindow.close();
+  };
   readonly maximizeWindow = async (): Promise<void> => {
     if (this.platform() === 'macos') await this.appWindow.setFullscreen(!await this.appWindow.isFullscreen());
     else await this.appWindow.toggleMaximize();
@@ -78,7 +84,8 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       this.resizeObserver.observe(this.host.nativeElement);
       window.addEventListener('keydown', this.handleShortcut, true);
       document.addEventListener('pointerdown', this.dismissTabMenu);
-      await this.addTab();
+      await this.restoreTabs();
+      this.hasRestoredTabs.set(true);
     } catch (error: unknown) {
       this.startupError.set(`Could not start terminal: ${String(error)}`);
       throw error;
@@ -123,7 +130,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       this.instances.delete(id);
       this.tabs.set(this.tabs().filter((tab): boolean => tab.id !== id));
       this.removeEmptyGroups();
-      if (!this.tabs().length) { await this.closeWindow(); return; }
+      if (!this.tabs().length) { this.activeId.set(''); await this.closeWindow(); return; }
       if (this.activeId() === id) this.activate(this.tabs()[Math.min(index, this.tabs().length - 1)]);
       else this.instances.get(this.activeId())?.terminal.focus();
     } finally { this.closingIds.update((ids): string[] => ids.filter((closingId): boolean => closingId !== id)); }
@@ -410,6 +417,28 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     await this.applyFont();
     await getCurrentWebview().setZoom(settings.scale / 100);
     this.scale.set(settings.scale);
+  }
+
+  private async restoreTabs(): Promise<void> {
+    const stored = localStorage.getItem('tiii-terminal-tabs');
+    if (stored === null) { await this.addTab(); return; }
+    const session = parseTerminalSession(stored);
+    if (session.tabs.some((tab): boolean => !this.profiles().some((profile): boolean => profile.id === tab.profileId))) {
+      throw new Error('Saved tab shell is unavailable - reinstall the shell or reset saved tabs');
+    }
+    this.groups.set(session.groups);
+    this.nextGroup = session.nextGroup;
+    this.tabs.set(session.tabs);
+    if (!session.tabs.length) { await this.addTab(); return; }
+    for (const tab of session.tabs) {
+      this.activeId.set(tab.id);
+      await this.mount(tab);
+    }
+    this.activate(session.tabs.find((tab): boolean => tab.id === session.activeId)!);
+  }
+
+  private saveTabs(): void {
+    localStorage.setItem('tiii-terminal-tabs', JSON.stringify({ tabs: this.tabs(), groups: this.groups(), activeId: this.activeId(), nextGroup: this.nextGroup }));
   }
 
   private saveSettings(): void {
