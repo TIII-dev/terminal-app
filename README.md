@@ -1,4 +1,4 @@
-# TIII Terminal
+# TIIIErminal
 
 A compact terminal desktop app built with Angular 22, Tauri 2, xterm.js, and a native PTY. UI state uses signals and zoneless change detection.
 
@@ -17,7 +17,7 @@ bun install
 bun run tauri:dev
 ```
 
-Run the frontend alone with `bun run dev`. Build desktop bundles on the corresponding operating system with `bun run build:windows` (NSIS/MSI), `bun run build:macos` (app/DMG), or `bun run build:linux` (Deb/RPM/AppImage).
+Run the frontend alone with `bun run dev`. Build desktop bundles on the corresponding operating system with `bun run build:windows` (NSIS/MSI), `bun run build:macos` (app/DMG), or `bun run build:linux` (Deb/RPM/AppImage). The app is named TIIIErminal; its executable is `tiiierminal.exe` on Windows and `tiiierminal` on macOS/Linux.
 
 Each terminal starts in the user's home directory. Windows defaults to PowerShell 7 with its user startup profiles enabled. macOS and Linux default to the user's `$SHELL` and launch it as a login shell.
 

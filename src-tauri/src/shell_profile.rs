@@ -47,7 +47,7 @@ pub fn detect_profiles() -> Result<Vec<ShellProfile>, String> {
         })
     }).collect();
     if !profiles.iter().any(|profile| profile.is_default) {
-        return Err("PowerShell 7 not found - install PowerShell 7 and add pwsh.exe to PATH, then restart TIII Terminal".into());
+        return Err("PowerShell 7 not found - install PowerShell 7 and add pwsh.exe to PATH, then restart TIIIErminal".into());
     }
     Ok(profiles)
 }

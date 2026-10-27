@@ -70,7 +70,7 @@
   </dialog>
 
   <dialog #aboutDialog class="dialog dialog--about" aria-labelledby="about-title" (close)="focusTerminal()">
-    <header class="dialog__header"><h1 id="about-title">TIII Terminal</h1><button class="dialog__close" aria-label="Close about" (click)="aboutDialog.close()">×</button></header>
+    <header class="dialog__header"><h1 id="about-title">TIIIErminal</h1><button class="dialog__close" aria-label="Close about" (click)="aboutDialog.close()">×</button></header>
     <section class="dialog__body"><p class="about__version">Version {{ version() }}</p><p>A compact home for your command line.</p><h2>Tab shortcuts</h2><dl class="shortcuts"><dt>New / close tab</dt><dd>{{ platform() === 'macos' ? '⌘' : 'Ctrl' }} T / W</dd><dt>Next / previous tab</dt><dd>Ctrl Tab / Shift Tab</dd><dt>Select tab by number</dt><dd>{{ platform() === 'macos' ? '⌘' : 'Ctrl' }} 1–9</dd><dt>Reopen closed tab</dt><dd>{{ platform() === 'macos' ? '⌘' : 'Ctrl' }} Shift T</dd></dl><p class="dialog__hint">Right-click a tab to manage groups. Drag tabs to reorder; drop onto a group label to join it. Reopening a closed tab starts a fresh shell.</p></section>
   </dialog>
 
