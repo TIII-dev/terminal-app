@@ -7,6 +7,8 @@ import type { ITerminalOptions } from '@xterm/xterm';
 import { themes } from './app.constants';
 
 const browser = new Window({ url: 'http://localhost:4200' });
+Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: browser.localStorage });
+Object.defineProperty(browser.document, 'fonts', { configurable: true, value: { load: (): Promise<FontFace[]> => Promise.resolve([]) } });
 for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'EventTarget', 'Event', 'MouseEvent', 'KeyboardEvent', 'ResizeObserver', 'requestAnimationFrame', 'cancelAnimationFrame'] as const) {
   Object.defineProperty(globalThis, name, { configurable: true, value: name === 'window' ? browser : browser[name] });
 }
@@ -35,7 +37,7 @@ mock.module('@tauri-apps/api/webview', (): object => ({ getCurrentWebview: (): o
 mock.module('@tauri-apps/api/event', (): object => ({ listen: (): Promise<() => void> => Promise.resolve((): void => {}) }));
 mock.module('@tauri-apps/api/core', (): object => ({ invoke: (command: string): Promise<unknown> => {
   if (command === 'get_platform') return Promise.resolve('windows');
-  if (command === 'get_profiles') return Promise.resolve([{ id: 'pwsh', name: 'PowerShell 7', isDefault: true }]);
+  if (command === 'get_profiles') return Promise.resolve([{ id: 'pwsh', name: 'PowerShell 7', isDefault: true }, { id: 'powershell', name: 'Windows PowerShell', isDefault: false }]);
   if (command === 'get_fonts') return Promise.resolve(['Cascadia Mono', 'Consolas']);
   if (['open_terminal', 'close_terminal', 'resize_terminal', 'write_terminal'].includes(command)) return Promise.resolve();
   throw new Error(`Unexpected native command: ${command}`);
@@ -69,6 +71,7 @@ let fixture: ReturnType<typeof TestBed.createComponent<InstanceType<typeof AppCo
 beforeEach(async (): Promise<void> => {
   windowActions.length = 0;
   terminals.length = 0;
+  localStorage.clear();
   TestBed.configureTestingModule({ imports: [AppComponent] });
   await TestBed.compileComponents();
   fixture = TestBed.createComponent(AppComponent);
@@ -180,6 +183,35 @@ test('selecting a theme updates every terminal palette and new tabs inherit it',
   await click('Close settings');
   await click('New terminal tab');
   expect(terminals[2].options.theme).toEqual(themes.Nord);
+});
+
+test('changed settings are saved and restored before the first terminal opens after restart', async (): Promise<void> => {
+  await click('Settings');
+  const profile = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
+  profile.value = 'powershell';
+  profile.dispatchEvent(new Event('change', { bubbles: true }));
+  for (const [selector, value] of [['input[list]', 'Consolas'], ['input[min="8"]', '16'], ['input[min="50"]', '125']]) {
+    const input = fixture.nativeElement.querySelector(selector) as HTMLInputElement;
+    input.value = value;
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    await fixture.whenStable();
+  }
+  await click('Theme');
+  await click('Nord');
+  const saved = localStorage.getItem('tiii-terminal-settings');
+  expect(saved).not.toBeNull();
+  expect(JSON.parse(saved!)).toEqual({ theme: 'Nord', profileId: 'powershell', fontFamily: 'Consolas', fontSize: 16, scale: 125 });
+  TestBed.resetTestingModule();
+  terminals.length = 0;
+  TestBed.configureTestingModule({ imports: [AppComponent] });
+  fixture = TestBed.createComponent(AppComponent);
+  fixture.autoDetectChanges();
+  await fixture.whenStable();
+  expect(fixture.componentInstance.tabs()[0].profileId).toBe('powershell');
+  expect(fixture.componentInstance.scale()).toBe(125);
+  expect(windowActions).toEqual(['zoom', 'zoom']);
+  expect(terminals[0].options).toMatchObject({ theme: themes.Nord, fontFamily: '"Consolas"', fontSize: 16 });
+  expect(localStorage.getItem('tiii-terminal-settings')).toBe(saved);
 });
 
 test('renamed and recolored groups collapse their inactive tabs', async (): Promise<void> => {

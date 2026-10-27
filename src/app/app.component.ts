@@ -9,6 +9,7 @@ import { Terminal } from '@xterm/xterm';
 
 import { themes } from './app.constants';
 import { OutputEvent, ShellProfile, TabMenu } from './app.types';
+import { parseSettings } from './settings/settings.utils';
 import { TabGroup, TerminalTab } from './terminal-tab/terminal-tab.types';
 import { getTabIcon, getTabShortcut, moveTabToGroup, reorderTab } from './terminal-tab/terminal-tab.utils';
 
@@ -66,6 +67,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       this.version.set(version);
       this.selectedProfile.set(this.profiles().find((profile): boolean => profile.isDefault));
       if (!this.selectedProfile()) throw new Error('No default shell profile found - check your installed shells');
+      await this.restoreSettings();
       this.unlisten = await listen<OutputEvent>('terminal-output', ({ payload }): void => { this.instances.get(payload.id)?.terminal.write(new Uint8Array(payload.data)); });
       this.resizeObserver.observe(this.host.nativeElement);
       window.addEventListener('keydown', this.handleShortcut, true);
@@ -314,6 +316,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     const profile = this.profiles().find((profile): boolean => profile.id === (event.target as HTMLSelectElement).value);
     if (!profile) throw new Error('Unknown shell profile - select an installed profile');
     this.selectedProfile.set(profile);
+    this.saveSettings();
   }
 
   setTheme(theme: keyof typeof themes): void {
@@ -322,6 +325,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       terminal.options.theme = this.themes[theme];
       terminal.refresh(0, terminal.rows - 1);
     }
+    this.saveSettings();
   }
 
   async setFont(event: Event): Promise<void> {
@@ -330,6 +334,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     if (!input.reportValidity()) return;
     this.fontFamily.set(input.value);
     await this.applyFont();
+    this.saveSettings();
   }
 
   async setFontSize(event: Event): Promise<void> {
@@ -337,6 +342,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     if (!input.reportValidity()) return;
     this.fontSize.set(input.valueAsNumber);
     await this.applyFont();
+    this.saveSettings();
   }
 
   async setScale(event: Event): Promise<void> {
@@ -346,6 +352,32 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     await getCurrentWebview().setZoom(scale / 100);
     this.scale.set(scale);
     this.instances.get(this.activeId())?.fit.fit();
+    this.saveSettings();
+  }
+
+  private async restoreSettings(): Promise<void> {
+    const stored = localStorage.getItem('tiii-terminal-settings');
+    if (stored === null) { this.saveSettings(); return; }
+    const settings = parseSettings(stored);
+    const profile = this.profiles().find((profile): boolean => profile.id === settings.profileId);
+    if (!profile) throw new Error('Saved shell profile is unavailable - reinstall the shell or reset saved settings');
+    if (settings.fontFamily !== 'monospace') {
+      this.fonts.set(await invoke<string[]>('get_fonts'));
+      if (!this.fonts().includes(settings.fontFamily)) throw new Error('Saved font is unavailable - reinstall the font or reset saved settings');
+    }
+    this.selectedProfile.set(profile);
+    this.theme.set(settings.theme);
+    this.fontFamily.set(settings.fontFamily);
+    this.fontSize.set(settings.fontSize);
+    await this.applyFont();
+    await getCurrentWebview().setZoom(settings.scale / 100);
+    this.scale.set(settings.scale);
+  }
+
+  private saveSettings(): void {
+    const profile = this.selectedProfile();
+    if (!profile) throw new Error('No shell profile selected - choose a profile before saving settings');
+    localStorage.setItem('tiii-terminal-settings', JSON.stringify({ theme: this.theme(), profileId: profile.id, fontFamily: this.fontFamily(), fontSize: this.fontSize(), scale: this.scale() }));
   }
 
   private get terminalFontFamily(): string { return this.fontFamily() === 'monospace' ? 'monospace' : JSON.stringify(this.fontFamily()); }
