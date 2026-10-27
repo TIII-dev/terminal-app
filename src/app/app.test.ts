@@ -1,15 +1,17 @@
-import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
+import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { plugin } from 'bun';
 import { Window } from 'happy-dom';
 import type { ITerminalOptions } from '@xterm/xterm';
 
 import { themes } from './app.constants';
+import { tabIcons } from './terminal-tab/terminal-tab.constants';
+import { readTabImage } from './terminal-tab/terminal-tab.image';
 
 const browser = new Window({ url: 'http://localhost:4200' });
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: browser.localStorage });
 Object.defineProperty(browser.document, 'fonts', { configurable: true, value: { load: (): Promise<FontFace[]> => Promise.resolve([]) } });
-for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'EventTarget', 'Event', 'MouseEvent', 'KeyboardEvent', 'ResizeObserver', 'requestAnimationFrame', 'cancelAnimationFrame'] as const) {
+for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'EventTarget', 'Event', 'MouseEvent', 'KeyboardEvent', 'ResizeObserver', 'File', 'FileReader', 'Image', 'requestAnimationFrame', 'cancelAnimationFrame'] as const) {
   Object.defineProperty(globalThis, name, { configurable: true, value: name === 'window' ? browser : browser[name] });
 }
 await import('@angular/compiler');
@@ -78,7 +80,7 @@ beforeEach(async (): Promise<void> => {
   fixture.autoDetectChanges();
   await fixture.whenStable();
 });
-afterEach((): void => { TestBed.resetTestingModule(); });
+afterEach((): void => { TestBed.resetTestingModule(); mock.restore(); });
 
 const click = async (label: string): Promise<void> => {
   const buttons = Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('button'));
@@ -90,6 +92,64 @@ const click = async (label: string): Promise<void> => {
 
 test('the application runs without loading ZoneJS', (): void => {
   expect(Reflect.has(globalThis, 'Zone')).toBe(false);
+});
+
+test('the tab context menu opens an icon picker and selecting a preset updates that tab', async (): Promise<void> => {
+  const selected = fixture.componentInstance.tabs()[0];
+  fixture.nativeElement.querySelector('.tab').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await fixture.whenStable();
+  await click('Edit icon');
+  expect(fixture.componentInstance.iconDialog.nativeElement.open).toBe(true);
+  const index = tabIcons.findIndex((icon): boolean => icon !== selected.icon);
+  await click(`Choose icon ${index + 1}`);
+  expect(fixture.nativeElement.querySelector('.tab__icon path').getAttribute('d')).toBe(tabIcons[index]);
+  expect(fixture.componentInstance.iconDialog.nativeElement.open).toBe(false);
+});
+
+test('SVG, JPG, and PNG uploads render as tab images and survive moving and reopening', async (): Promise<void> => {
+  spyOn(browser.HTMLImageElement.prototype, 'decode').mockResolvedValue();
+  await click('New terminal tab');
+  const id = fixture.componentInstance.tabs()[1].id;
+  for (const type of ['image/svg+xml', 'image/jpeg', 'image/png']) {
+    fixture.componentInstance.openIconEditor(id);
+    const input = fixture.nativeElement.querySelector('input[type="file"]') as HTMLInputElement;
+    Object.defineProperty(input, 'files', { configurable: true, value: [new File(['image bytes'], 'icon', { type })] });
+    await fixture.componentInstance.uploadTabIcon({ target: input } as unknown as Event);
+    await fixture.whenStable();
+    expect(fixture.nativeElement.querySelector('.tab--active img').getAttribute('src')).toStartWith(`data:${type};base64,`);
+  }
+  const icon = fixture.componentInstance.tabs()[1].icon;
+  fixture.componentInstance.moveActiveTab(-1);
+  await fixture.componentInstance.closeTab(id);
+  await fixture.componentInstance.reopenTab();
+  await fixture.whenStable();
+  expect(fixture.nativeElement.querySelector('.tab--active img').getAttribute('src')).toBe(icon);
+});
+
+test('icons belonging to another open tab cannot be selected in the picker', async (): Promise<void> => {
+  await click('New terminal tab');
+  const tabs = fixture.componentInstance.tabs();
+  fixture.componentInstance.openIconEditor(tabs[1].id);
+  await fixture.whenStable();
+  const index = tabIcons.indexOf(tabs[0].icon);
+  const button = fixture.nativeElement.querySelector(`[aria-label="Choose icon ${index + 1}"]`) as HTMLButtonElement;
+  expect(button.disabled).toBe(true);
+  button.click();
+  expect(fixture.componentInstance.tabs()[1].icon).toBe(tabs[1].icon);
+});
+
+test('unsupported, empty, and undecodable images are rejected without changing the tab icon', async (): Promise<void> => {
+  const icon = fixture.componentInstance.tabs()[0].icon;
+  fixture.componentInstance.openIconEditor(fixture.componentInstance.tabs()[0].id);
+  await expect(readTabImage(new File(['text'], 'icon.txt', { type: 'text/plain' }))).rejects.toThrow('Unsupported icon');
+  await expect(readTabImage(new File([], 'icon.png', { type: 'image/png' }))).rejects.toThrow('Unsupported icon');
+  spyOn(browser.HTMLImageElement.prototype, 'decode').mockRejectedValue(new Error('Invalid image'));
+  const input = fixture.nativeElement.querySelector('input[type="file"]') as HTMLInputElement;
+  Object.defineProperty(input, 'files', { value: [new File(['broken'], 'icon.png', { type: 'image/png' })] });
+  await expect(fixture.componentInstance.uploadTabIcon({ target: input } as unknown as Event)).rejects.toThrow('Invalid icon image');
+  await fixture.whenStable();
+  expect(fixture.componentInstance.tabs()[0].icon).toBe(icon);
+  expect(fixture.nativeElement.querySelector('.dialog--icon [role="alert"]').textContent).toContain('Invalid icon image');
 });
 
 test('asynchronous startup displays the first tab and window controls without another click', (): void => {

@@ -15,7 +15,7 @@ svg { fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; st
 .tab--active:hover { background:#3b3847; }
 .tab--grouped::after { content:''; position:absolute; bottom:-3px; left:-2px; right:-2px; height:2px; background:var(--group-color); }
 .tab__select { display:flex; align-items:center; flex:1; align-self:stretch; gap:7px; min-width:0; padding:0 4px 0 8px; border:0; border-radius:5px; background:transparent; font-size:11px; text-align:left; }
-.tab__icon { width:13px; height:13px; flex-shrink:0; color:#ceccd8; }
+.tab__icon { width:13px; height:13px; flex-shrink:0; object-fit:contain; color:#ceccd8; }
 .tab__close { display:grid; place-items:center; width:20px; height:20px; padding:0; margin-right:4px; border:0; border-radius:4px; background:transparent; opacity:0; }
 .tab__close svg { width:12px; height:12px; }
 .tab:hover .tab__close,.tab--active .tab__close,.tab:focus-within .tab__close { opacity:1; }
@@ -92,6 +92,11 @@ svg { fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; st
 .shortcuts dt { color:#b7b1c8; }
 .shortcuts dd { margin:0; color:#eee8fc; }
 .dialog--group { width:310px; }
+.dialog--icon { width:310px; }
+.icon_grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+.icon_grid button { display:grid; place-items:center; height:40px; border:1px solid #ffffff20; border-radius:6px; background:transparent; }
+.icon_grid button:hover { background:#ffffff10; }
+.icon_grid svg { width:20px; height:20px; }
 .group_colors { display:flex; gap:12px; }
 .group_colors button { width:22px; height:22px; border:3px solid transparent; border-radius:50%; background-clip:padding-box; }
 .group_colors__color--selected { outline:1px solid #ddd; outline-offset:2px; }

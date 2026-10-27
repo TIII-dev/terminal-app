@@ -10,6 +10,8 @@ import { Terminal } from '@xterm/xterm';
 import { themes } from './app.constants';
 import { OutputEvent, ShellProfile, TabMenu } from './app.types';
 import { parseSettings } from './settings/settings.utils';
+import { tabIcons } from './terminal-tab/terminal-tab.constants';
+import { readTabImage } from './terminal-tab/terminal-tab.image';
 import { TabGroup, TerminalTab } from './terminal-tab/terminal-tab.types';
 import { getTabIcon, getTabShortcut, moveTabToGroup, reorderTab } from './terminal-tab/terminal-tab.utils';
 
@@ -20,8 +22,12 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   @ViewChild('settingsDialog', { static: true }) settingsDialog!: ElementRef<HTMLDialogElement>;
   @ViewChild('aboutDialog', { static: true }) aboutDialog!: ElementRef<HTMLDialogElement>;
   @ViewChild('groupDialog', { static: true }) groupDialog!: ElementRef<HTMLDialogElement>;
+  @ViewChild('iconDialog', { static: true }) iconDialog!: ElementRef<HTMLDialogElement>;
   @ViewChild('appMenu', { static: true }) appMenu!: ElementRef<HTMLDetailsElement>;
   readonly themes = themes;
+  readonly tabIcons = tabIcons;
+  readonly iconError = signal('');
+  private editingIconId = '';
   readonly themeNames = Object.keys(themes) as (keyof typeof themes)[];
   readonly groupColors = [{ name: 'Purple', value: '#b79aff' }, { name: 'Blue', value: '#78b6ff' }, { name: 'Green', value: '#75d8b1' }, { name: 'Yellow', value: '#f0c674' }, { name: 'Pink', value: '#f38ba8' }, { name: 'Gray', value: '#9ba5b7' }];
   readonly theme = signal<keyof typeof themes>('Dracula');
@@ -152,7 +158,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   }
 
   readonly handleShortcut = async (event: KeyboardEvent): Promise<void> => {
-    if (this.settingsDialog.nativeElement.open || this.aboutDialog.nativeElement.open || this.groupDialog.nativeElement.open) return;
+    if (this.settingsDialog.nativeElement.open || this.aboutDialog.nativeElement.open || this.groupDialog.nativeElement.open || this.iconDialog.nativeElement.open) return;
     if (event.key === 'Escape' && (this.tabMenu() || this.appMenu.nativeElement.open)) {
       this.tabMenu.set(undefined);
       this.appMenu.nativeElement.open = false;
@@ -207,6 +213,38 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     if (!(event.target instanceof Element) || !event.target.closest('.context_menu')) this.tabMenu.set(undefined);
     if (!(event.target instanceof Element) || !event.target.closest('.app_menu')) this.appMenu.nativeElement.open = false;
   };
+
+  openIconEditor(tabId: string): void {
+    if (!this.tabs().some((tab): boolean => tab.id === tabId)) throw new Error('Unknown tab - select an open terminal tab');
+    this.editingIconId = tabId;
+    this.iconError.set('');
+    this.tabMenu.set(undefined);
+    this.iconDialog.nativeElement.showModal();
+  }
+
+  isIconUsed(icon: string): boolean { return this.tabs().some((tab): boolean => tab.id !== this.editingIconId && tab.icon === icon); }
+
+  setTabIcon(icon: string): void {
+    if (!this.tabs().some((tab): boolean => tab.id === this.editingIconId)) throw new Error('Unknown tab - select an open terminal tab');
+    if (this.isIconUsed(icon)) throw new Error('Icon is already used - choose another icon');
+    this.tabs.update((tabs): TerminalTab[] => tabs.map((tab): TerminalTab => tab.id === this.editingIconId ? { ...tab, icon } : tab));
+    this.iconDialog.nativeElement.close();
+  }
+
+  async uploadTabIcon(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    const tabId = this.editingIconId;
+    this.iconError.set('');
+    try {
+      const icon = await readTabImage(file);
+      if (this.editingIconId !== tabId || !this.iconDialog.nativeElement.open) return;
+      this.setTabIcon(icon);
+    }
+    catch (error: unknown) { this.iconError.set(String(error)); throw error; }
+    finally { input.value = ''; }
+  }
 
   handleMenuKey(event: KeyboardEvent): void {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;

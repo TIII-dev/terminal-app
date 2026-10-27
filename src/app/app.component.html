@@ -9,7 +9,7 @@
           }
         }
         <div class="tab" [class.tab--active]="tab.id === activeId()" [class.tab--grouped]="tab.groupId" [style.--group-color]="tab.groupId ? getGroup(tab.groupId).color : null" [hidden]="isTabHidden(tab)" [attr.data-tab-id]="tab.id" draggable="true" (dragstart)="startTabDrag($event, tab)" (dragover)="$event.preventDefault()" (drop)="dropTab($event, tab)" (contextmenu)="openTabMenu($event, tab)" (mousedown)="$event.button === 1 && $event.preventDefault()" (auxclick)="handleMiddleClick($event, tab)">
-          <button class="tab__select" role="tab" [id]="'tab-' + tab.id" [attr.aria-selected]="tab.id === activeId()" aria-controls="terminal-panel" [tabIndex]="tab.id === activeId() ? 0 : -1" [title]="'Terminal ' + ($index + 1) + ' · ' + tab.profileName" (click)="activate(tab)" (keydown)="handleTabKey($event, tab)"><svg class="tab__icon" viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="tab.icon"/></svg><span>{{ $index + 1 }}</span></button>
+          <button class="tab__select" role="tab" [id]="'tab-' + tab.id" [attr.aria-selected]="tab.id === activeId()" aria-controls="terminal-panel" [tabIndex]="tab.id === activeId() ? 0 : -1" [title]="'Terminal ' + ($index + 1) + ' · ' + tab.profileName" (click)="activate(tab)" (keydown)="handleTabKey($event, tab)">@if (tab.icon.startsWith('data:image/')) { <img class="tab__icon" [src]="tab.icon" alt=""> } @else { <svg class="tab__icon" viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="tab.icon"/></svg> }<span>{{ $index + 1 }}</span></button>
           <button class="tab__close" [attr.aria-label]="'Close terminal ' + ($index + 1)" title="Close tab" [disabled]="closingIds().includes(tab.id)" (click)="closeTab(tab.id)"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m3 3 6 6m0-6-6 6"/></svg></button>
         </div>
       }
@@ -36,6 +36,7 @@
 
   @if (tabMenu(); as menu) {
     <div class="context_menu" role="menu" aria-label="Tab actions" [style.left.px]="menu.x" [style.top.px]="menu.y" (keydown)="handleMenuKey($event)">
+      <button role="menuitem" (click)="openIconEditor(menu.tabId)">Edit icon</button>
       <button role="menuitem" (click)="createGroup(menu.tabId)">Add tab to new group</button>
       @for (group of groups(); track group.id) { <button role="menuitem" [disabled]="menu.groupId === group.id" (click)="assignGroup(menu.tabId, group.id)"><span class="context_menu__dot" [style.background]="group.color"></span>Move to {{ group.name }}</button> }
       @if (menu.groupId) { <button role="menuitem" (click)="assignGroup(menu.tabId, null)">Remove from group</button> }
@@ -44,6 +45,15 @@
       <button role="menuitem" [disabled]="!closedTabs().length" (click)="tabMenu.set(undefined); reopenTab()">Reopen closed tab</button>
     </div>
   }
+
+  <dialog #iconDialog class="dialog dialog--icon" aria-labelledby="icon-title" (close)="focusTerminal()">
+    <header class="dialog__header"><h1 id="icon-title">Edit icon</h1><button class="dialog__close" aria-label="Close icon editor" (click)="iconDialog.close()">×</button></header>
+    <section class="dialog__body">
+      <div class="icon_grid" aria-label="Built-in icons">@for (icon of tabIcons; track icon) { <button [attr.aria-label]="'Choose icon ' + ($index + 1)" [disabled]="isIconUsed(icon)" (click)="setTabIcon(icon)"><svg viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="icon"/></svg></button> }</div>
+      <label class="field">Upload SVG, JPG, or PNG<input type="file" accept="image/svg+xml,image/jpeg,image/png,.svg,.jpg,.jpeg,.png" (change)="uploadTabIcon($event)"></label>
+      @if (iconError()) { <p class="terminal_host__error" role="alert">{{ iconError() }}</p> }
+    </section>
+  </dialog>
 
   <dialog #settingsDialog class="dialog" aria-labelledby="settings-title" (close)="focusTerminal()">
     <header class="dialog__header"><h1 id="settings-title">Settings</h1><button class="dialog__close" aria-label="Close settings" (click)="settingsDialog.close()">×</button></header>
