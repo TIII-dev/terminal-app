@@ -1,0 +1,83 @@
+<main class="shell" [style.--terminal-bg]="themes[theme()].background" [style.--terminal-scrollbar]="themes[theme()].selectionBackground" [style.--terminal-scrollbar-hover]="themes[theme()].cursor">
+  <header class="toolbar" [attr.data-platform]="platform()">
+    <div #tabList class="tabs" role="tablist" aria-label="Terminal tabs">
+      @for (tab of tabs(); track tab.id) {
+        @if (tab.groupId; as groupId) {
+          @let group = getGroup(groupId);
+          @if ($index === 0 || tabs()[$index - 1].groupId !== groupId) {
+            <button class="group_label" [style.--group-color]="group.color" [attr.aria-expanded]="!group.isCollapsed" (click)="toggleGroup(group.id)" (contextmenu)="$event.preventDefault(); openGroup(group)" (dragover)="$event.preventDefault()" (drop)="dropIntoGroup($event, group)" [title]="group.name + ' — right-click to edit'">{{ group.name }}<svg viewBox="0 0 12 12" aria-hidden="true" [class.group_label__chevron--collapsed]="group.isCollapsed"><path d="m3 4.5 3 3 3-3"/></svg></button>
+          }
+        }
+        <div class="tab" [class.tab--active]="tab.id === activeId()" [class.tab--grouped]="tab.groupId" [style.--group-color]="tab.groupId ? getGroup(tab.groupId).color : null" [hidden]="isTabHidden(tab)" [attr.data-tab-id]="tab.id" draggable="true" (dragstart)="startTabDrag($event, tab)" (dragover)="$event.preventDefault()" (drop)="dropTab($event, tab)" (contextmenu)="openTabMenu($event, tab)" (mousedown)="$event.button === 1 && $event.preventDefault()" (auxclick)="handleMiddleClick($event, tab)">
+          <button class="tab__select" role="tab" [id]="'tab-' + tab.id" [attr.aria-selected]="tab.id === activeId()" aria-controls="terminal-panel" [tabIndex]="tab.id === activeId() ? 0 : -1" [title]="'Terminal ' + ($index + 1) + ' · ' + tab.profileName" (click)="activate(tab)" (keydown)="handleTabKey($event, tab)"><svg class="tab__icon" viewBox="0 0 24 24" aria-hidden="true"><path [attr.d]="tab.icon"/></svg><span>{{ $index + 1 }}</span></button>
+          <button class="tab__close" [attr.aria-label]="'Close terminal ' + ($index + 1)" title="Close tab" [disabled]="closingIds().includes(tab.id)" (click)="closeTab(tab.id)"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m3 3 6 6m0-6-6 6"/></svg></button>
+        </div>
+      }
+    </div>
+    <button class="toolbar__new" (click)="addTab()" [disabled]="!selectedProfile()" aria-label="New terminal tab" title="New tab"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10"/></svg></button>
+    <span class="toolbar__space" data-tauri-drag-region></span>
+    <details #appMenu class="app_menu">
+      <summary aria-label="Application menu" title="Application menu"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M4 10h12M4 15h12"/></svg></summary>
+      <div class="app_menu__panel" role="menu" (keydown)="handleMenuKey($event)">
+        <button role="menuitem" aria-label="Settings" (click)="appMenu.open = false; openSettings()">Settings<span aria-hidden="true">›</span></button>
+        <button role="menuitem" aria-label="About" (click)="appMenu.open = false; aboutDialog.showModal()">About<span aria-hidden="true">ⓘ</span></button>
+      </div>
+    </details>
+    @if (platform()) {
+      <div class="window_controls" aria-label="Window controls">
+        <button class="window_controls__button window_controls__button--minimize" (click)="minimizeWindow()" aria-label="Minimize" title="Minimize"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 6h8"/></svg></button>
+        <button class="window_controls__button window_controls__button--maximize" (click)="maximizeWindow()" [attr.aria-label]="platform() === 'macos' ? 'Toggle fullscreen' : 'Maximize or restore'" [title]="platform() === 'macos' ? 'Toggle fullscreen' : 'Maximize or restore'"><svg viewBox="0 0 12 12" aria-hidden="true"><rect x="2" y="2" width="8" height="8"/></svg></button>
+        <button class="window_controls__button window_controls__button--close" (click)="closeWindow()" aria-label="Close window" title="Close window"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m2 2 8 8m0-8-8 8"/></svg></button>
+      </div>
+    }
+  </header>
+
+  <section #terminalHost id="terminal-panel" class="terminal_host" role="tabpanel" [attr.aria-labelledby]="activeId() ? 'tab-' + activeId() : null" aria-label="Terminal">@if (startupError()) { <p class="terminal_host__error" role="alert">{{ startupError() }}</p> }</section>
+
+  @if (tabMenu(); as menu) {
+    <div class="context_menu" role="menu" aria-label="Tab actions" [style.left.px]="menu.x" [style.top.px]="menu.y" (keydown)="handleMenuKey($event)">
+      <button role="menuitem" (click)="createGroup(menu.tabId)">Add tab to new group</button>
+      @for (group of groups(); track group.id) { <button role="menuitem" [disabled]="menu.groupId === group.id" (click)="assignGroup(menu.tabId, group.id)"><span class="context_menu__dot" [style.background]="group.color"></span>Move to {{ group.name }}</button> }
+      @if (menu.groupId) { <button role="menuitem" (click)="assignGroup(menu.tabId, null)">Remove from group</button> }
+      <hr>
+      <button role="menuitem" (click)="tabMenu.set(undefined); closeTab(menu.tabId)">Close tab<kbd>{{ platform() === 'macos' ? '⌘ W' : 'Ctrl W' }}</kbd></button>
+      <button role="menuitem" [disabled]="!closedTabs().length" (click)="tabMenu.set(undefined); reopenTab()">Reopen closed tab</button>
+    </div>
+  }
+
+  <dialog #settingsDialog class="dialog" aria-labelledby="settings-title" (close)="focusTerminal()">
+    <header class="dialog__header"><h1 id="settings-title">Settings</h1><button class="dialog__close" aria-label="Close settings" (click)="settingsDialog.close()">×</button></header>
+    <nav class="dialog__tabs" role="tablist" aria-label="Settings categories" (keydown)="handleSettingsKey($event)">
+      <button id="main-settings-tab" role="tab" [attr.aria-selected]="settingsTab() === 'main'" [tabIndex]="settingsTab() === 'main' ? 0 : -1" aria-controls="main-settings" (click)="settingsTab.set('main')">Main</button>
+      <button id="theme-settings-tab" role="tab" [attr.aria-selected]="settingsTab() === 'theme'" [tabIndex]="settingsTab() === 'theme' ? 0 : -1" aria-controls="theme-settings" (click)="settingsTab.set('theme')">Theme</button>
+    </nav>
+    @if (settingsTab() === 'main') {
+      <section id="main-settings" class="dialog__body" role="tabpanel" aria-labelledby="main-settings-tab">
+        <label class="field">Profiles<select [value]="selectedProfile()?.id" (change)="setProfile($event)">@for (profile of profiles(); track profile.id) { <option [value]="profile.id">{{ profile.name }}{{ profile.isDefault ? ' (default)' : '' }}</option> }</select><small>For new tabs. Your shell's startup profile loads automatically.</small></label>
+        <label class="field">Font<input list="installed-fonts" [value]="fontFamily()" (input)="clearInputValidity($event)" (change)="setFont($event)" autocomplete="off" spellcheck="false" required><datalist id="installed-fonts"><option value="monospace">System monospace</option>@for (font of fonts(); track font) { <option [value]="font"></option> }</datalist><small>@if (fontError()) { <span role="alert">{{ fontError() }}</span> } @else if (fonts().length) { {{ fonts().length }} installed font families. A monospace font keeps columns aligned. } @else { Detecting installed fonts… }</small></label>
+        <div class="field_row">
+          <label class="field">Font size<div class="field__unit"><input type="number" min="8" max="48" step="1" required [value]="fontSize()" (change)="setFontSize($event)"><span>px</span></div></label>
+          <label class="field">Scale<div class="field__unit"><input type="number" min="50" max="200" step="5" required [value]="scale()" (change)="setScale($event)"><span>%</span></div></label>
+        </div>
+      </section>
+    } @else {
+      <section id="theme-settings" class="dialog__body" role="tabpanel" aria-labelledby="theme-settings-tab">
+        <p class="dialog__hint">Choose a coding theme. Changes apply to every terminal.</p>
+        <div class="theme_grid">@for (name of themeNames; track name) { <button class="theme_card" [class.theme_card--selected]="theme() === name" [attr.aria-pressed]="theme() === name" (click)="setTheme(name)"><span class="theme_card__swatches" [style.background]="themes[name].background"><i [style.background]="themes[name].red"></i><i [style.background]="themes[name].green"></i><i [style.background]="themes[name].yellow"></i><i [style.background]="themes[name].blue"></i><i [style.background]="themes[name].magenta"></i></span><span>{{ name }}</span>@if (theme() === name) { <span class="theme_card__check">✓</span> }</button> }</div>
+        <div class="theme_preview" [style.background]="themes[theme()].background" [style.color]="themes[theme()].foreground" [style.font-family]="fontFamily()"><span [style.color]="themes[theme()].green">❯</span> echo "hello, terminal"<br><span [style.color]="themes[theme()].cyan">hello, terminal</span></div>
+      </section>
+    }
+  </dialog>
+
+  <dialog #aboutDialog class="dialog dialog--about" aria-labelledby="about-title" (close)="focusTerminal()">
+    <header class="dialog__header"><h1 id="about-title">TIII Terminal</h1><button class="dialog__close" aria-label="Close about" (click)="aboutDialog.close()">×</button></header>
+    <section class="dialog__body"><p class="about__version">Version {{ version() }}</p><p>A compact home for your command line.</p><h2>Tab shortcuts</h2><dl class="shortcuts"><dt>New / close tab</dt><dd>{{ platform() === 'macos' ? '⌘' : 'Ctrl' }} T / W</dd><dt>Next / previous tab</dt><dd>Ctrl Tab / Shift Tab</dd><dt>Select tab by number</dt><dd>{{ platform() === 'macos' ? '⌘' : 'Ctrl' }} 1–9</dd><dt>Reopen closed tab</dt><dd>{{ platform() === 'macos' ? '⌘' : 'Ctrl' }} Shift T</dd></dl><p class="dialog__hint">Right-click a tab to manage groups. Drag tabs to reorder; drop onto a group label to join it. Reopening a closed tab starts a fresh shell.</p></section>
+  </dialog>
+
+  <dialog #groupDialog class="dialog dialog--group" aria-labelledby="group-title" (close)="focusTerminal()">
+    @if (editingGroup(); as group) {
+      <header class="dialog__header"><h1 id="group-title">Tab group</h1><button class="dialog__close" aria-label="Close group settings" (click)="groupDialog.close()">×</button></header>
+      <section class="dialog__body"><label class="field">Name<input [value]="group.name" maxlength="32" required (input)="clearInputValidity($event)" (change)="renameGroup($event)"></label><div class="group_colors" aria-label="Group color">@for (color of groupColors; track color) { <button [style.background]="color.value" [class.group_colors__color--selected]="group.color === color.value" [attr.aria-label]="color.name" [attr.aria-pressed]="group.color === color.value" (click)="setGroupColor(color.value)"></button> }</div><button class="group_action" (click)="groupDialog.close(); addTab(group.id)">New tab in group</button><button class="group_action" (click)="ungroup(group)">Ungroup tabs</button><button class="group_action group_action--danger" (click)="closeGroup(group)">Close group</button></section>
+    }
+  </dialog>
+</main>
