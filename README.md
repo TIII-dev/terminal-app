@@ -21,7 +21,7 @@ Run the frontend alone with `bun run dev`. Build desktop bundles on the correspo
 
 Each terminal starts in the user's home directory. Windows defaults to PowerShell 7 with its user startup profiles enabled. macOS and Linux default to the user's `$SHELL` and launch it as a login shell.
 
-The application menu contains Settings and About. Settings → Main includes shell profiles, a searchable installed-font combobox, terminal font size, and application scale (50–200%). Theme contains the coding themes. Font detection scans standard system and user font directories. Appearance changes apply immediately for the current app session.
+The application menu contains Settings and About. Settings → Main includes shell profiles, a searchable installed-font combobox, terminal font size, and application scale (50–200%). Theme contains the coding themes and updates every terminal's background, foreground, cursor, selection, and ANSI palette immediately, including new tabs. Programs that emit explicit RGB colors retain those colors. Font detection scans standard system and user font directories. Appearance changes apply immediately for the current app session.
 
 Profiles affect new tabs; existing sessions keep their shell. Windows also detects Windows PowerShell and Command Prompt from PATH. macOS and Linux also detect installed Zsh, Bash, Fish, and POSIX shells in their standard system locations. Scrollbars are thin and follow the terminal theme.
 

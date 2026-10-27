@@ -318,7 +318,10 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   setTheme(theme: keyof typeof themes): void {
     this.theme.set(theme);
-    for (const { terminal } of this.instances.values()) terminal.options.theme = this.themes[theme];
+    for (const { terminal } of this.instances.values()) {
+      terminal.options.theme = this.themes[theme];
+      terminal.refresh(0, terminal.rows - 1);
+    }
   }
 
   async setFont(event: Event): Promise<void> {

@@ -2,6 +2,9 @@ import { afterEach, beforeEach, expect, mock, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { plugin } from 'bun';
 import { Window } from 'happy-dom';
+import type { ITerminalOptions } from '@xterm/xterm';
+
+import { themes } from './app.constants';
 
 const browser = new Window({ url: 'http://localhost:4200' });
 for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'EventTarget', 'Event', 'MouseEvent', 'KeyboardEvent', 'ResizeObserver', 'requestAnimationFrame', 'cancelAnimationFrame'] as const) {
@@ -38,10 +41,12 @@ mock.module('@tauri-apps/api/core', (): object => ({ invoke: (command: string): 
   throw new Error(`Unexpected native command: ${command}`);
 } }));
 
+const terminals: TerminalSurface[] = [];
 class TerminalSurface {
   readonly cols = 80;
   readonly rows = 24;
-  readonly options = {};
+  readonly options: ITerminalOptions;
+  constructor(options: ITerminalOptions) { this.options = options; terminals.push(this); }
   element: HTMLDivElement | undefined;
   open(host: HTMLElement): void { this.element = document.createElement('div'); host.appendChild(this.element); }
   loadAddon(): void {}
@@ -49,6 +54,7 @@ class TerminalSurface {
   onResize(): void {}
   focus(): void {}
   write(): void {}
+  refresh(): void {}
   dispose(): void { this.element?.remove(); }
 }
 mock.module('@xterm/xterm', (): object => ({ Terminal: TerminalSurface }));
@@ -62,6 +68,7 @@ let fixture: ReturnType<typeof TestBed.createComponent<InstanceType<typeof AppCo
 
 beforeEach(async (): Promise<void> => {
   windowActions.length = 0;
+  terminals.length = 0;
   TestBed.configureTestingModule({ imports: [AppComponent] });
   await TestBed.compileComponents();
   fixture = TestBed.createComponent(AppComponent);
@@ -161,6 +168,18 @@ test('detected fonts appear after the native font query completes', async (): Pr
   await click('Settings');
   expect(Array.from<HTMLOptionElement>(fixture.nativeElement.querySelectorAll('#installed-fonts option')).map((option): string => option.value)).toEqual(['monospace', 'Cascadia Mono', 'Consolas']);
   expect(fixture.nativeElement.textContent).toContain('2 installed font families');
+});
+
+test('selecting a theme updates every terminal palette and new tabs inherit it', async (): Promise<void> => {
+  expect(terminals[0].options.theme).toEqual(themes.Dracula);
+  await click('New terminal tab');
+  await click('Settings');
+  await click('Theme');
+  await click('Nord');
+  for (const terminal of terminals) expect(terminal.options.theme).toEqual(themes.Nord);
+  await click('Close settings');
+  await click('New terminal tab');
+  expect(terminals[2].options.theme).toEqual(themes.Nord);
 });
 
 test('renamed and recolored groups collapse their inactive tabs', async (): Promise<void> => {
