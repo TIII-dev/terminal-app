@@ -243,15 +243,17 @@ test('detected fonts appear after the native font query completes', async (): Pr
 });
 
 test('selecting a theme updates every terminal palette and new tabs inherit it', async (): Promise<void> => {
-  expect(terminals[0].options.theme).toEqual(themes.Dracula);
+  expect(terminals[0].options.theme).toEqual({ ...themes.Dracula, background: '#00000000' });
+  expect(terminals[0].options.allowTransparency).toBe(true);
   await click('New terminal tab');
   await click('Settings');
   await click('Theme');
   await click('Nord');
-  for (const terminal of terminals) expect(terminal.options.theme).toEqual(themes.Nord);
+  for (const terminal of terminals) expect(terminal.options.theme).toEqual({ ...themes.Nord, background: '#00000000' });
+  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-bg')).toBe(themes.Nord.background);
   await click('Close settings');
   await click('New terminal tab');
-  expect(terminals[2].options.theme).toEqual(themes.Nord);
+  expect(terminals[2].options.theme).toEqual({ ...themes.Nord, background: '#00000000' });
 });
 
 test('changed settings are saved and restored before the first terminal opens after restart', async (): Promise<void> => {
@@ -269,14 +271,29 @@ test('changed settings are saved and restored before the first terminal opens af
   await click('Nord');
   const saved = localStorage.getItem('tiii-terminal-settings');
   expect(saved).not.toBeNull();
-  expect(JSON.parse(saved!)).toEqual({ theme: 'Nord', profileId: 'powershell', fontFamily: 'Consolas', fontSize: 16, scale: 125 });
+  expect(JSON.parse(saved!)).toEqual({ theme: 'Nord', profileId: 'powershell', fontFamily: 'Consolas', fontSize: 16, scale: 125, backgroundOpacity: 100 });
   await restartApp();
   expect(fixture.componentInstance.tabs()[0].profileId).toBe('pwsh');
   expect(fixture.componentInstance.selectedProfile()?.id).toBe('powershell');
   expect(fixture.componentInstance.scale()).toBe(125);
   expect(windowActions).toEqual(['zoom', 'zoom']);
-  expect(terminals[0].options).toMatchObject({ theme: themes.Nord, fontFamily: '"Consolas"', fontSize: 16 });
+  expect(terminals[0].options).toMatchObject({ theme: { ...themes.Nord, background: '#00000000' }, fontFamily: '"Consolas"', fontSize: 16 });
   expect(localStorage.getItem('tiii-terminal-settings')).toBe(saved);
+});
+
+test('acrylic opacity changes the background without fading terminal text and survives restart', async (): Promise<void> => {
+  await click('Settings');
+  const input = fixture.nativeElement.querySelector('input[aria-label="Acrylic opacity"]') as HTMLInputElement;
+  input.value = '65';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  await fixture.whenStable();
+  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-opacity')).toBe('65%');
+  expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
+  expect(terminals[0].options.theme?.foreground).toBe(themes.Dracula.foreground);
+  await restartApp();
+  expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
+  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-opacity')).toBe('65%');
+  expect(terminals[0].options.theme?.background).toBe('#00000000');
 });
 
 test('tabs restore their order, uploaded icons, groups, shell profiles, and active selection after restart', async (): Promise<void> => {

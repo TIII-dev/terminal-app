@@ -5,7 +5,7 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { FitAddon } from '@xterm/addon-fit';
-import { Terminal } from '@xterm/xterm';
+import { ITheme, Terminal } from '@xterm/xterm';
 
 import { themes } from './app.constants';
 import { OutputEvent, ShellProfile, TabMenu } from './app.types';
@@ -47,6 +47,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   readonly fontFamily = signal('monospace');
   readonly fontSize = signal(13);
   readonly scale = signal(100);
+  readonly backgroundOpacity = signal(100);
   readonly fontError = signal<string | undefined>(undefined);
   readonly tabMenu = signal<TabMenu | undefined>(undefined);
   private readonly editingGroupId = signal<string | undefined>(undefined);
@@ -367,7 +368,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   setTheme(theme: keyof typeof themes): void {
     this.theme.set(theme);
     for (const { terminal } of this.instances.values()) {
-      terminal.options.theme = this.themes[theme];
+      terminal.options.theme = this.terminalTheme;
       terminal.refresh(0, terminal.rows - 1);
     }
     this.saveSettings();
@@ -400,6 +401,13 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     this.saveSettings();
   }
 
+  setBackgroundOpacity(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.reportValidity()) return;
+    this.backgroundOpacity.set(input.valueAsNumber);
+    this.saveSettings();
+  }
+
   private async restoreSettings(): Promise<void> {
     const stored = localStorage.getItem('tiii-terminal-settings');
     if (stored === null) { this.saveSettings(); return; }
@@ -414,6 +422,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     this.theme.set(settings.theme);
     this.fontFamily.set(settings.fontFamily);
     this.fontSize.set(settings.fontSize);
+    this.backgroundOpacity.set(settings.backgroundOpacity);
     await this.applyFont();
     await getCurrentWebview().setZoom(settings.scale / 100);
     this.scale.set(settings.scale);
@@ -444,10 +453,11 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private saveSettings(): void {
     const profile = this.selectedProfile();
     if (!profile) throw new Error('No shell profile selected - choose a profile before saving settings');
-    localStorage.setItem('tiii-terminal-settings', JSON.stringify({ theme: this.theme(), profileId: profile.id, fontFamily: this.fontFamily(), fontSize: this.fontSize(), scale: this.scale() }));
+    localStorage.setItem('tiii-terminal-settings', JSON.stringify({ theme: this.theme(), profileId: profile.id, fontFamily: this.fontFamily(), fontSize: this.fontSize(), scale: this.scale(), backgroundOpacity: this.backgroundOpacity() }));
   }
 
   private get terminalFontFamily(): string { return this.fontFamily() === 'monospace' ? 'monospace' : JSON.stringify(this.fontFamily()); }
+  private get terminalTheme(): ITheme { return { ...this.themes[this.theme()], background: '#00000000' }; }
 
   clearInputValidity(event: Event): void { (event.target as HTMLInputElement).setCustomValidity(''); }
 
@@ -463,7 +473,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   }
 
   private async mount(tab: TerminalTab): Promise<void> {
-    const terminal = new Terminal({ theme: this.themes[this.theme()], fontFamily: this.terminalFontFamily, fontSize: this.fontSize(), cursorBlink: true });
+    const terminal = new Terminal({ theme: this.terminalTheme, allowTransparency: true, fontFamily: this.terminalFontFamily, fontSize: this.fontSize(), cursorBlink: true });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     this.instances.set(tab.id, { terminal, fit });

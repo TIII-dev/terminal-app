@@ -6,4 +6,5 @@ export type Settings = {
   fontFamily: string;
   fontSize: number;
   scale: number;
+  backgroundOpacity: number;
 };

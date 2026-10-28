@@ -1,4 +1,4 @@
-<main class="shell" [style.--terminal-bg]="themes[theme()].background" [style.--terminal-scrollbar]="themes[theme()].selectionBackground" [style.--terminal-scrollbar-hover]="themes[theme()].cursor">
+<main class="shell" [style.--terminal-bg]="themes[theme()].background" [style.--terminal-opacity]="backgroundOpacity() + '%'" [style.--terminal-scrollbar]="themes[theme()].selectionBackground" [style.--terminal-scrollbar-hover]="themes[theme()].cursor">
   <header class="toolbar" [attr.data-platform]="platform()">
     <div #tabList class="tabs" role="tablist" aria-label="Terminal tabs">
       @for (tab of tabs(); track tab.id) {
@@ -69,6 +69,7 @@
           <label class="field">Font size<div class="field__unit"><input type="number" min="8" max="48" step="1" required [value]="fontSize()" (change)="setFontSize($event)"><span>px</span></div></label>
           <label class="field">Scale<div class="field__unit"><input type="number" min="50" max="200" step="5" required [value]="scale()" (change)="setScale($event)"><span>%</span></div></label>
         </div>
+        <label class="field">Acrylic opacity — {{ backgroundOpacity() }}%<input type="range" min="0" max="100" step="1" aria-label="Acrylic opacity" [value]="backgroundOpacity()" (input)="setBackgroundOpacity($event)"><small>100% is opaque. Lower values reveal acrylic on Windows, vibrancy on macOS, or transparency on Linux. Text stays opaque.</small></label>
       </section>
     } @else {
       <section id="theme-settings" class="dialog__body" role="tabpanel" aria-labelledby="theme-settings-tab">
