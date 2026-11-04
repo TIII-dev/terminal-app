@@ -167,6 +167,21 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   readonly handleShortcut = async (event: KeyboardEvent): Promise<void> => {
     if (this.settingsDialog.nativeElement.open || this.aboutDialog.nativeElement.open || this.groupDialog.nativeElement.open || this.iconDialog.nativeElement.open) return;
+    if (this.platform() === 'linux' && event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey
+      && ['c', 'v'].includes(event.key.toLowerCase()) && event.target instanceof Node && this.host.nativeElement.contains(event.target)) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.repeat) return;
+      const terminal = this.instances.get(this.activeId())?.terminal;
+      if (!terminal) return;
+      if (event.key.toLowerCase() === 'c') {
+        if (terminal.hasSelection()) await invoke('write_clipboard', { text: terminal.getSelection() });
+      } else {
+        const text = await invoke<string>('read_clipboard');
+        if (this.instances.get(this.activeId())?.terminal === terminal) terminal.paste(text);
+      }
+      return;
+    }
     if (event.key === 'Escape' && (this.tabMenu() || this.appMenu.nativeElement.open)) {
       this.tabMenu.set(undefined);
       this.appMenu.nativeElement.open = false;

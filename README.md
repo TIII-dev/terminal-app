@@ -43,4 +43,6 @@ Tab numbers follow their left-to-right positions and update when tabs move, clos
 | Move tab left / right | Ctrl+Shift+PageUp / PageDown | Ctrl+Shift+PageUp / PageDown |
 | Close window | Ctrl+Shift+W | Cmd+Shift+W |
 
+On Linux, copy terminal selections with **Ctrl+Shift+C** and paste with **Ctrl+Shift+V**. **Ctrl+C** remains the shell interrupt shortcut. Pasting respects the terminal's bracketed paste mode.
+
 Reopening a closed tab starts a fresh shell; it does not restore the terminated process. Run the UI and tab behavior tests with `bun test` and the Rust tests with `cargo test --manifest-path src-tauri/Cargo.toml --lib`. UI tests run zoneless with native async functions and mock the native window and terminal-rendering boundaries.

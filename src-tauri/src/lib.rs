@@ -68,6 +68,33 @@ fn get_platform() -> &'static str {
     std::env::consts::OS
 }
 
+// Synchronous commands run on the main thread, as required by GTK.
+#[tauri::command]
+fn read_clipboard() -> Result<String, String> {
+    #[cfg(target_os = "linux")]
+    {
+        Ok(gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD).wait_for_text().map(|text| text.to_string()).unwrap_or_default())
+    }
+    #[cfg(not(target_os = "linux"))]
+    Err("Native clipboard commands are only used on Linux".into())
+}
+
+#[tauri::command]
+fn write_clipboard(text: String) -> Result<(), String> {
+    #[cfg(target_os = "linux")]
+    {
+        let clipboard = gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD);
+        clipboard.set_text(&text);
+        clipboard.store();
+        Ok(())
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = text;
+        Err("Native clipboard commands are only used on Linux".into())
+    }
+}
+
 #[tauri::command]
 fn get_profiles() -> Result<Vec<shell_profile::ShellProfile>, String> {
     shell_profile::detect_profiles()
@@ -92,7 +119,7 @@ async fn get_fonts() -> Result<Vec<String>, String> {
 pub fn run() {
     tauri::Builder::default()
         .manage(Sessions::default())
-        .invoke_handler(tauri::generate_handler![open_terminal, write_terminal, resize_terminal, close_terminal, get_platform, get_profiles, get_fonts])
+        .invoke_handler(tauri::generate_handler![open_terminal, write_terminal, resize_terminal, close_terminal, get_platform, get_profiles, get_fonts, read_clipboard, write_clipboard])
         .run(tauri::generate_context!())
         .expect("error while running Tauri application");
 }

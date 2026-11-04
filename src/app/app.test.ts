@@ -37,7 +37,10 @@ mock.module('@tauri-apps/api/window', (): object => ({ getCurrentWindow: (): obj
 mock.module('@tauri-apps/api/app', (): object => ({ getVersion: (): Promise<string> => Promise.resolve('0.1.0') }));
 mock.module('@tauri-apps/api/webview', (): object => ({ getCurrentWebview: (): object => ({ setZoom: (): Promise<void> => action('zoom') }) }));
 mock.module('@tauri-apps/api/event', (): object => ({ listen: (): Promise<() => void> => Promise.resolve((): void => {}) }));
-mock.module('@tauri-apps/api/core', (): object => ({ invoke: (command: string): Promise<unknown> => {
+const clipboardWrites: string[] = [];
+mock.module('@tauri-apps/api/core', (): object => ({ invoke: (command: string, args?: { text: string }): Promise<unknown> => {
+  if (command === 'read_clipboard') return Promise.resolve('first\nsecond');
+  if (command === 'write_clipboard') { clipboardWrites.push(args!.text); return Promise.resolve(); }
   if (command === 'get_platform') return Promise.resolve('windows');
   if (command === 'get_profiles') return Promise.resolve([{ id: 'pwsh', name: 'PowerShell 7', isDefault: true }, { id: 'powershell', name: 'Windows PowerShell', isDefault: false }]);
   if (command === 'get_fonts') return Promise.resolve(['Cascadia Mono', 'Consolas']);
@@ -59,6 +62,11 @@ class TerminalSurface {
   focus(): void {}
   write(): void {}
   refresh(): void {}
+  selection = '';
+  readonly pasted: string[] = [];
+  hasSelection(): boolean { return this.selection.length > 0; }
+  getSelection(): string { return this.selection; }
+  paste(text: string): void { this.pasted.push(text); }
   dispose(): void { this.element?.remove(); }
 }
 mock.module('@xterm/xterm', (): object => ({ Terminal: TerminalSurface }));
@@ -72,6 +80,7 @@ let fixture: ReturnType<typeof TestBed.createComponent<InstanceType<typeof AppCo
 
 beforeEach(async (): Promise<void> => {
   windowActions.length = 0;
+  clipboardWrites.length = 0;
   terminals.length = 0;
   localStorage.clear();
   TestBed.configureTestingModule({ imports: [AppComponent] });
@@ -192,6 +201,31 @@ test('window buttons request minimize, maximize and close on the native window',
   await click('Maximize or restore');
   await click('Close window');
   expect(windowActions).toEqual(['minimize', 'maximize', 'close']);
+});
+
+test('Linux clipboard shortcuts copy selections and paste through the terminal without intercepting Ctrl+C', async (): Promise<void> => {
+  fixture.componentInstance.platform.set('linux');
+  const terminal = terminals[0];
+  const host = fixture.nativeElement.querySelector('.terminal_host');
+  const press = (key: string, shiftKey = true): KeyboardEvent => {
+    const event = new KeyboardEvent('keydown', { key, ctrlKey: true, shiftKey, bubbles: true, cancelable: true });
+    host.dispatchEvent(event);
+    return event;
+  };
+  expect(press('C').defaultPrevented).toBe(true);
+  await fixture.whenStable();
+  expect(clipboardWrites).toEqual([]);
+  terminal.selection = 'selected output';
+  press('C');
+  await fixture.whenStable();
+  expect(clipboardWrites).toEqual(['selected output']);
+  expect(press('V').defaultPrevented).toBe(true);
+  await fixture.whenStable();
+  expect(terminal.pasted).toEqual(['first\nsecond']);
+  expect(press('c', false).defaultPrevented).toBe(false);
+  await click('Settings');
+  expect(press('V').defaultPrevented).toBe(false);
+  expect(terminal.pasted).toHaveLength(1);
 });
 
 test('moving a tab renumbers it while its icon and numeric shortcut follow the new position', async (): Promise<void> => {
