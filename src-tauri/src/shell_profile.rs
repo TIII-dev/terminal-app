@@ -15,6 +15,9 @@ pub struct ShellProfile {
 impl ShellProfile {
     pub fn command(&self) -> CommandBuilder {
         let mut command = CommandBuilder::new(&self.executable);
+        // The renderer is xterm-compatible; desktop launchers may supply no usable TERM.
+        command.env("TERM", "xterm-256color");
+        command.env("COLORTERM", "truecolor");
         match self.executable.file_stem().and_then(|name| name.to_str()) {
             Some("pwsh" | "powershell") => command.args(["-NoLogo"]),
             Some("cmd") => {},
@@ -78,6 +81,14 @@ pub fn detect_profiles() -> Result<Vec<ShellProfile>, String> {
 mod tests {
     use super::*;
     use std::ffi::OsString;
+
+    #[test]
+    fn terminal_sessions_advertise_xterm_and_truecolor_support() {
+        let profile = ShellProfile { id: "default".into(), name: "Zsh".into(), is_default: true, executable: "/bin/zsh".into() };
+        let command = profile.command();
+        assert_eq!(command.get_env("TERM"), Some(std::ffi::OsStr::new("xterm-256color")));
+        assert_eq!(command.get_env("COLORTERM"), Some(std::ffi::OsStr::new("truecolor")));
+    }
 
     #[test]
     fn powershell_starts_with_user_profiles_enabled() {
