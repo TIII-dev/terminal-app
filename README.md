@@ -27,6 +27,12 @@ Profiles affect new tabs; existing sessions keep their shell. Windows also detec
 
 Format source files with `bun run format:ts`, `bun run format:css`, and `bun run format:rs`. TypeScript and CSS use Bun's built-in formatter; Rust uses rustfmt through Cargo.
 
+## Install an existing Linux build
+
+Run `npm run install:linux` (or `npm run install:linux:arch` on Arch/CachyOS). This installs the existing `src-tauri/target/release/tiiierminal` binary to `~/.local/bin` and adds an application-menu launcher and icon under `${XDG_DATA_HOME:-~/.local/share}`. No rebuild or sudo is needed. The system must already have the Tauri Linux runtime dependencies installed.
+
+Run the command again after building to update the installed app. Add `~/.local/bin` to your `PATH` to launch it as `tiiierminal` from a shell.
+
 ## Tabs and groups
 
 Open tabs, their order, shell profiles, icons, groups (names, colors, collapsed state), and the active tab save automatically under `tiii-terminal-tabs` in disk-backed WebView local storage. Startup restores the layout and opens a fresh shell in each tab; running processes, working directories, and terminal output are not restored. Closing the last tab clears the layout, so the next startup opens one new tab. Invalid saved layouts or unavailable shells stop startup without overwriting the saved layout; remove that storage entry to reset it.
@@ -42,6 +48,8 @@ Tab numbers follow their left-to-right positions and update when tabs move, clos
 | Select tabs 1–9 by number | Ctrl+1–9 | Cmd+1–9 |
 | Move tab left / right | Ctrl+Shift+PageUp / PageDown | Ctrl+Shift+PageUp / PageDown |
 | Close window | Ctrl+Shift+W | Cmd+Shift+W |
+
+Right-click the terminal for Copy, Paste, Select all, and Clear scrollback. Copy is disabled without a selection. Right-clicking a tab continues to show tab actions.
 
 On Linux, copy terminal selections with **Ctrl+Shift+C** and paste with **Ctrl+Shift+V**. **Ctrl+C** remains the shell interrupt shortcut. Pasting respects the terminal's bracketed paste mode.
 

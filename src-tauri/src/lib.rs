@@ -18,16 +18,35 @@ struct Sessions(Mutex<HashMap<String, Session>>);
 struct Output { id: String, data: Vec<u8> }
 
 #[tauri::command]
-fn open_terminal(app: AppHandle, sessions: State<'_, Sessions>, id: String, cols: u16, rows: u16, profile_id: String) -> Result<(), String> {
+fn open_terminal(app: AppHandle, sessions: State<'_, Sessions>, id: String, cols: u16, rows: u16, profile_id: String, directory: Option<String>) -> Result<(), String> {
     let profile = shell_profile::detect_profiles()?.into_iter().find(|profile| profile.id == profile_id).ok_or("Unknown shell profile - select an installed profile in Settings")?;
     let mut command = profile.command();
-    command.cwd(std::env::home_dir().ok_or("Could not find the user home directory")?);
+    let home = std::env::home_dir().ok_or("Could not find the user home directory")?;
+    let directory = directory.map(std::path::PathBuf::from).filter(|path| path.is_absolute() && path.is_dir()).unwrap_or(home);
+    command.cwd(directory);
     let pty = native_pty_system().openpty(PtySize { rows, cols, pixel_width: 0, pixel_height: 0 }).map_err(|error| error.to_string())?;
     let child = pty.slave.spawn_command(command).map_err(|error| error.to_string())?;
+    #[cfg(target_os = "linux")]
+    let process_id = child.process_id();
     drop(pty.slave);
     let mut reader = pty.master.try_clone_reader().map_err(|error| error.to_string())?;
     let writer = pty.master.take_writer().map_err(|error| error.to_string())?;
     sessions.0.lock().map_err(|error| error.to_string())?.insert(id.clone(), Session { master: pty.master, writer, child });
+    #[cfg(target_os = "linux")]
+    if let Some(process_id) = process_id {
+        let app = app.clone();
+        let id = id.clone();
+        std::thread::spawn(move || {
+            let mut previous = None;
+            while let Ok(directory) = std::fs::read_link(format!("/proc/{process_id}/cwd")) {
+                if previous.as_ref() != Some(&directory) {
+                    let _ = app.emit("terminal-directory", serde_json::json!({ "id": id, "directory": directory }));
+                    previous = Some(directory);
+                }
+                std::thread::sleep(std::time::Duration::from_millis(250));
+            }
+        });
+    }
     std::thread::spawn(move || {
         let mut buffer = [0; 4096];
         loop {

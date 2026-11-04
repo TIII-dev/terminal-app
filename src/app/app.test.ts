@@ -36,9 +36,15 @@ mock.module('@tauri-apps/api/window', (): object => ({ getCurrentWindow: (): obj
 }) }));
 mock.module('@tauri-apps/api/app', (): object => ({ getVersion: (): Promise<string> => Promise.resolve('0.1.0') }));
 mock.module('@tauri-apps/api/webview', (): object => ({ getCurrentWebview: (): object => ({ setZoom: (): Promise<void> => action('zoom') }) }));
-mock.module('@tauri-apps/api/event', (): object => ({ listen: (): Promise<() => void> => Promise.resolve((): void => {}) }));
+const eventListeners = new Map<string, (event: { payload: { id: string; directory: string } }) => void>();
+mock.module('@tauri-apps/api/event', (): object => ({ listen: (name: string, callback: (event: { payload: { id: string; directory: string } }) => void): Promise<() => void> => {
+  eventListeners.set(name, callback);
+  return Promise.resolve((): void => { eventListeners.delete(name); });
+} }));
+const openedDirectories: unknown[] = [];
 const clipboardWrites: string[] = [];
 mock.module('@tauri-apps/api/core', (): object => ({ invoke: (command: string, args?: { text: string }): Promise<unknown> => {
+  if (command === 'open_terminal') openedDirectories.push((args as unknown as { directory: unknown }).directory);
   if (command === 'read_clipboard') return Promise.resolve('first\nsecond');
   if (command === 'write_clipboard') { clipboardWrites.push(args!.text); return Promise.resolve(); }
   if (command === 'get_platform') return Promise.resolve('windows');
@@ -67,6 +73,8 @@ class TerminalSurface {
   hasSelection(): boolean { return this.selection.length > 0; }
   getSelection(): string { return this.selection; }
   paste(text: string): void { this.pasted.push(text); }
+  selectAll(): void { this.selection = 'all output'; }
+  clear(): void { this.selection = ''; }
   dispose(): void { this.element?.remove(); }
 }
 mock.module('@xterm/xterm', (): object => ({ Terminal: TerminalSurface }));
@@ -226,6 +234,40 @@ test('Linux clipboard shortcuts copy selections and paste through the terminal w
   await click('Settings');
   expect(press('V').defaultPrevented).toBe(false);
   expect(terminal.pasted).toHaveLength(1);
+});
+
+test('terminal context menu supports clipboard and buffer actions separately from tab actions', async (): Promise<void> => {
+  fixture.componentInstance.platform.set('linux');
+  const terminal = terminals[0];
+  const open = async (): Promise<void> => {
+    fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    await fixture.whenStable();
+  };
+  await open();
+  expect(fixture.nativeElement.querySelector('[aria-label="Terminal actions"] button').disabled).toBe(true);
+  terminal.selection = 'selected output';
+  await open();
+  await click('Copy');
+  expect(clipboardWrites).toEqual(['selected output']);
+  expect(fixture.componentInstance.terminalMenu()).toBeUndefined();
+  await open();
+  await click('Paste');
+  expect(terminal.pasted).toEqual(['first\nsecond']);
+  await open();
+  await click('Select all');
+  expect(terminal.selection).toBe('all output');
+  await open();
+  await click('Clear scrollback');
+  expect(terminal.selection).toBe('');
+  await open();
+  fixture.nativeElement.querySelector('[aria-label="Terminal actions"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
+  await fixture.whenStable();
+  expect(fixture.componentInstance.terminalMenu()).toBeUndefined();
+  await open();
+  fixture.nativeElement.querySelector('.tab').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  await fixture.whenStable();
+  expect(fixture.nativeElement.querySelector('[aria-label="Terminal actions"]')).toBeNull();
+  expect(fixture.nativeElement.querySelector('[aria-label="Tab actions"]')).not.toBeNull();
 });
 
 test('moving a tab renumbers it while its icon and numeric shortcut follow the new position', async (): Promise<void> => {
@@ -388,4 +430,15 @@ test('renamed and recolored groups collapse their inactive tabs', async (): Prom
   expect(label.style.getPropertyValue('--group-color')).toBe('#75d8b1');
   await click('Work');
   expect(fixture.nativeElement.querySelector('.tab[hidden] .tab__select').textContent.trim()).toBe('2');
+});
+
+
+test('Linux directory changes persist per tab and are passed back to the shell on restart', async (): Promise<void> => {
+  const id = fixture.componentInstance.tabs()[0].id;
+  const directory = '/home/user/Projects/space and ünicode';
+  eventListeners.get('terminal-directory')!({ payload: { id, directory } });
+  await fixture.whenStable();
+  expect(JSON.parse(localStorage.getItem('tiii-terminal-tabs')!).tabs[0].directory).toBe(directory);
+  await restartApp();
+  expect(openedDirectories.at(-1)).toBe(directory);
 });

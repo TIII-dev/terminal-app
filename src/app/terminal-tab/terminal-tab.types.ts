@@ -4,6 +4,7 @@ export type TerminalTab = {
   profileId: string;
   profileName: string;
   groupId: string | null;
+  directory?: string;
 };
 
 export type TabGroup = { id: string; name: string; color: string; isCollapsed: boolean };

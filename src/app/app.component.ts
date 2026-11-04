@@ -50,12 +50,15 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   readonly backgroundOpacity = signal(100);
   readonly fontError = signal<string | undefined>(undefined);
   readonly tabMenu = signal<TabMenu | undefined>(undefined);
+  readonly terminalMenu = signal<{ tabId: string; x: number; y: number; hasSelection: boolean } | undefined>(undefined);
+  readonly clipboardError = signal('');
   private readonly editingGroupId = signal<string | undefined>(undefined);
   readonly editingGroup = computed((): TabGroup | undefined => this.groups().find((group): boolean => group.id === this.editingGroupId()));
   private nextGroup = 1;
   private readonly hasRestoredTabs = signal(false);
   private readonly persistTabs = effect((): void => { if (this.hasRestoredTabs()) this.saveTabs(); });
   private unlisten?: UnlistenFn;
+  private unlistenDirectory?: UnlistenFn;
   private readonly appWindow = getCurrentWindow();
   private readonly pendingTasks = inject(PendingTasks);
   private readonly instances = new Map<string, { terminal: Terminal; fit: FitAddon }>();
@@ -82,6 +85,9 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       if (!this.selectedProfile()) throw new Error('No default shell profile found - check your installed shells');
       await this.restoreSettings();
       this.unlisten = await listen<OutputEvent>('terminal-output', ({ payload }): void => { this.instances.get(payload.id)?.terminal.write(new Uint8Array(payload.data)); });
+      this.unlistenDirectory = await listen<{ id: string; directory: string }>('terminal-directory', ({ payload }): void => {
+        this.tabs.update((tabs): TerminalTab[] => tabs.map((tab): TerminalTab => tab.id === payload.id ? { ...tab, directory: payload.directory } : tab));
+      });
       this.resizeObserver.observe(this.host.nativeElement);
       window.addEventListener('keydown', this.handleShortcut, true);
       document.addEventListener('pointerdown', this.dismissTabMenu);
@@ -111,6 +117,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   }
 
   activate(tab: TerminalTab): void {
+    this.terminalMenu.set(undefined);
     this.activeId.set(tab.id);
     this.renderActive();
     this.scrollActiveTab();
@@ -182,7 +189,8 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       }
       return;
     }
-    if (event.key === 'Escape' && (this.tabMenu() || this.appMenu.nativeElement.open)) {
+    if (event.key === 'Escape' && (this.tabMenu() || this.terminalMenu() || this.appMenu.nativeElement.open)) {
+      this.terminalMenu.set(undefined);
       this.tabMenu.set(undefined);
       this.appMenu.nativeElement.open = false;
       this.focusTerminal();
@@ -228,14 +236,47 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   openTabMenu(event: MouseEvent, tab: TerminalTab): void {
     event.preventDefault();
+    this.terminalMenu.set(undefined);
     this.tabMenu.set({ tabId: tab.id, groupId: tab.groupId, x: Math.max(8, Math.min(event.clientX, window.innerWidth - 240)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 300)) });
     requestAnimationFrame((): void => { document.querySelector<HTMLButtonElement>('.context_menu button')?.focus(); });
   }
 
   readonly dismissTabMenu = (event: PointerEvent): void => {
+    if (!(event.target instanceof Element) || !event.target.closest('.context_menu')) this.terminalMenu.set(undefined);
     if (!(event.target instanceof Element) || !event.target.closest('.context_menu')) this.tabMenu.set(undefined);
     if (!(event.target instanceof Element) || !event.target.closest('.app_menu')) this.appMenu.nativeElement.open = false;
   };
+
+  openTerminalMenu(event: MouseEvent): void {
+    const terminal = this.instances.get(this.activeId())?.terminal;
+    if (!terminal) return;
+    event.preventDefault();
+    this.tabMenu.set(undefined);
+    this.clipboardError.set('');
+    this.terminalMenu.set({ tabId: this.activeId(), x: Math.max(8, Math.min(event.clientX, window.innerWidth - 240)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 240)), hasSelection: terminal.hasSelection() });
+    requestAnimationFrame((): void => { document.querySelector<HTMLButtonElement>('[aria-label="Terminal actions"] button:not(:disabled)')?.focus(); });
+  }
+
+  async terminalAction(action: 'copy' | 'paste' | 'select-all' | 'clear'): Promise<void> {
+    const menu = this.terminalMenu();
+    const terminal = menu && this.instances.get(menu.tabId)?.terminal;
+    if (!terminal) return;
+    try {
+      if (action === 'copy' && terminal.hasSelection()) {
+        const text = terminal.getSelection();
+        if (this.platform() === 'linux') await invoke('write_clipboard', { text });
+        else await navigator.clipboard.writeText(text);
+      } else if (action === 'paste') {
+        const text = this.platform() === 'linux' ? await invoke<string>('read_clipboard') : await navigator.clipboard.readText();
+        if (this.activeId() === menu.tabId && this.instances.get(menu.tabId)?.terminal === terminal) terminal.paste(text);
+      } else if (action === 'select-all') terminal.selectAll();
+      else if (action === 'clear') terminal.clear();
+      this.terminalMenu.set(undefined);
+      this.focusTerminal();
+    } catch (error: unknown) {
+      this.clipboardError.set(`Clipboard action failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 
   openIconEditor(tabId: string): void {
     if (!this.tabs().some((tab): boolean => tab.id === tabId)) throw new Error('Unknown tab - select an open terminal tab');
@@ -496,7 +537,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     this.renderActive();
     this.fitTerminal({ terminal, fit });
     const { cols, rows } = terminal;
-    await invoke('open_terminal', { id: tab.id, cols, rows, profileId: tab.profileId });
+    await invoke('open_terminal', { id: tab.id, cols, rows, profileId: tab.profileId, directory: tab.directory ?? null });
     terminal.onData((data): void => { void invoke('write_terminal', { id: tab.id, data }); });
     terminal.onResize((size): void => { void invoke('resize_terminal', { id: tab.id, cols: size.cols, rows: size.rows }); });
     if (tab.id === this.activeId()) { this.fitTerminal({ terminal, fit }); terminal.focus(); }
@@ -532,6 +573,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.unlisten?.();
+    this.unlistenDirectory?.();
     this.resizeObserver.disconnect();
     window.removeEventListener('keydown', this.handleShortcut, true);
     document.removeEventListener('pointerdown', this.dismissTabMenu);

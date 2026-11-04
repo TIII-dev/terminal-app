@@ -32,7 +32,18 @@
     }
   </header>
 
-  <section #terminalHost id="terminal-panel" class="terminal_host" role="tabpanel" [attr.aria-labelledby]="activeId() ? 'tab-' + activeId() : null" aria-label="Terminal">@if (startupError()) { <p class="terminal_host__error" role="alert">{{ startupError() }}</p> }</section>
+  <section #terminalHost id="terminal-panel" class="terminal_host" role="tabpanel" [attr.aria-labelledby]="activeId() ? 'tab-' + activeId() : null" aria-label="Terminal" (contextmenu)="openTerminalMenu($event)">@if (startupError()) { <p class="terminal_host__error" role="alert">{{ startupError() }}</p> }</section>
+
+  @if (terminalMenu(); as menu) {
+    <div class="context_menu" role="menu" aria-label="Terminal actions" [style.left.px]="menu.x" [style.top.px]="menu.y" (keydown)="handleMenuKey($event)">
+      <button role="menuitem" [disabled]="!menu.hasSelection" (click)="terminalAction('copy')">Copy</button>
+      <button role="menuitem" (click)="terminalAction('paste')">Paste</button>
+      <hr>
+      <button role="menuitem" (click)="terminalAction('select-all')">Select all</button>
+      <button role="menuitem" (click)="terminalAction('clear')">Clear scrollback</button>
+      @if (clipboardError()) { <p role="alert">{{ clipboardError() }}</p> }
+    </div>
+  }
 
   @if (tabMenu(); as menu) {
     <div class="context_menu" role="menu" aria-label="Tab actions" [style.left.px]="menu.x" [style.top.px]="menu.y" (keydown)="handleMenuKey($event)">

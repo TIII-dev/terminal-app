@@ -8,6 +8,8 @@
     "build:windows": "tauri build --bundles nsis,msi",
     "build:macos": "tauri build --bundles app,dmg",
     "build:linux": "tauri build --bundles deb,rpm,appimage",
+    "install:linux": "bash scripts/install-linux.sh",
+    "install:linux:arch": "npm run install:linux",
     "test": "bun test src",
     "format:ts": "bun fmt --single-quote \"src/**/*.ts\"",
     "format:css": "bun fmt \"src/**/*.css\"",

@@ -8,6 +8,7 @@ const isTab = (value: unknown): value is TerminalTab => isRecord(value)
   && isId(value['id']) && isId(value['profileId'])
   && typeof value['profileName'] === 'string' && value['profileName'].trim().length > 0
   && (value['groupId'] === null || isId(value['groupId']))
+  && (value['directory'] === undefined || (typeof value['directory'] === 'string' && value['directory'].length > 0 && !value['directory'].includes('\0')))
   && typeof value['icon'] === 'string'
   && (/^[MmLlHhVvCcSsQqTtAaZz0-9\s.,+-]+$/.test(value['icon']) || /^data:image\/(svg\+xml|jpeg|png);base64,[A-Za-z0-9+/]+={0,2}$/.test(value['icon']));
 

@@ -34,3 +34,14 @@ test('group members separated by another tab are rejected', (): void => {
   const tabs = [...session.tabs, { ...session.tabs[0], id: 'third', icon: 'M1 1h2' }];
   expect(() => parseTerminalSession(JSON.stringify({ ...session, tabs }))).toThrow('Split saved tab group');
 });
+
+
+test('saved directories preserve Linux and Windows paths while rejecting invalid values', (): void => {
+  for (const directory of ['/home/user/a space/ü', 'C:\\Users\\user\\Projects']) {
+    const saved = { ...session, tabs: [{ ...session.tabs[0], directory }, session.tabs[1]] };
+    expect(parseTerminalSession(JSON.stringify(saved)).tabs[0].directory).toBe(directory);
+  }
+  for (const directory of ['', null, 123, '/tmp/\0invalid']) {
+    expect(() => parseTerminalSession(JSON.stringify({ ...session, tabs: [{ ...session.tabs[0], directory }, session.tabs[1]] }))).toThrow('Invalid saved tabs');
+  }
+});
