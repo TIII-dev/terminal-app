@@ -60,7 +60,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private readonly pendingTasks = inject(PendingTasks);
   private readonly instances = new Map<string, { terminal: Terminal; fit: FitAddon }>();
   private readonly openingTabs = new Map<string, Promise<void>>();
-  private readonly resizeObserver = new ResizeObserver(() => this.instances.get(this.activeId())?.fit.fit());
+  private readonly resizeObserver = new ResizeObserver(() => { const instance = this.instances.get(this.activeId()); if (instance) this.fitTerminal(instance); });
   readonly minimizeWindow = (): Promise<void> => this.appWindow.minimize();
   readonly closeWindow = (): Promise<void> => {
     if (this.hasRestoredTabs()) this.saveTabs();
@@ -397,7 +397,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     const scale = input.valueAsNumber;
     await getCurrentWebview().setZoom(scale / 100);
     this.scale.set(scale);
-    this.instances.get(this.activeId())?.fit.fit();
+    const instance = this.instances.get(this.activeId()); if (instance) this.fitTerminal(instance);
     this.saveSettings();
   }
 
@@ -469,7 +469,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       terminal.options.fontFamily = this.terminalFontFamily;
       terminal.options.fontSize = this.fontSize();
     }
-    this.instances.get(this.activeId())?.fit.fit();
+    const instance = this.instances.get(this.activeId()); if (instance) this.fitTerminal(instance);
   }
 
   private async mount(tab: TerminalTab): Promise<void> {
@@ -479,18 +479,36 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     this.instances.set(tab.id, { terminal, fit });
     terminal.open(this.host.nativeElement);
     this.renderActive();
-    fit.fit();
+    this.fitTerminal({ terminal, fit });
     const { cols, rows } = terminal;
     await invoke('open_terminal', { id: tab.id, cols, rows, profileId: tab.profileId });
     terminal.onData((data): void => { void invoke('write_terminal', { id: tab.id, data }); });
     terminal.onResize((size): void => { void invoke('resize_terminal', { id: tab.id, cols: size.cols, rows: size.rows }); });
-    if (tab.id === this.activeId()) { fit.fit(); terminal.focus(); }
+    if (tab.id === this.activeId()) { this.fitTerminal({ terminal, fit }); terminal.focus(); }
+  }
+
+  // FitAddon can pick one row more than the host shows, because the measured cell height is
+  // fractional while rows are drawn at whole pixels. Drop rows whose rendered bottom is past the
+  // visible area of the terminal host.
+  private fitTerminal({ terminal, fit }: { terminal: Terminal; fit: FitAddon }): void {
+    fit.fit();
+    const host = this.host.nativeElement;
+    const rowsElement = terminal.element?.querySelector('.xterm-rows');
+    const firstRow = rowsElement?.firstElementChild;
+    const lastRow = rowsElement?.lastElementChild;
+    if (!firstRow || !lastRow) return;
+    const visibleBottom = host.getBoundingClientRect().bottom - parseFloat(getComputedStyle(host).paddingBottom);
+    const overflow = lastRow.getBoundingClientRect().bottom - visibleBottom;
+    if (overflow <= 0) return;
+    const rowHeight = firstRow.getBoundingClientRect().height;
+    const extraRows = Math.ceil(overflow / rowHeight);
+    if (extraRows > 0 && terminal.rows - extraRows >= 1) terminal.resize(terminal.cols, terminal.rows - extraRows);
   }
 
   private renderActive(): void {
     for (const [id, { terminal }] of this.instances) terminal.element!.style.display = id === this.activeId() ? 'block' : 'none';
     const instance = this.instances.get(this.activeId());
-    if (instance) { instance.fit.fit(); instance.terminal.focus(); }
+    if (instance) { this.fitTerminal(instance); instance.terminal.focus(); }
   }
 
   private scrollActiveTab(): void {

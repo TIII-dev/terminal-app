@@ -18,7 +18,13 @@ impl ShellProfile {
         match self.executable.file_stem().and_then(|name| name.to_str()) {
             Some("pwsh" | "powershell") => command.args(["-NoLogo"]),
             Some("cmd") => {},
-            _ => command.args(["-l"]),
+            _ => {
+                command.args(["-l"]);
+                // Powerlevel10k starts its setup wizard in any shell that has no ~/.p10k.zsh and no
+                // POWERLEVEL9K_* settings. Setting one here keeps the wizard out of new tabs.
+                #[cfg(not(target_os = "windows"))]
+                command.env("POWERLEVEL9K_LAUNCHED_BY", "TIIIErminal");
+            },
         }
         command
     }
@@ -83,6 +89,13 @@ mod tests {
     fn unix_shell_loads_login_startup_files() {
         let profile = ShellProfile { id: "default".into(), name: "Zsh".into(), is_default: true, executable: "/bin/zsh".into() };
         assert_eq!(profile.command().get_argv(), &vec![OsString::from("/bin/zsh"), OsString::from("-l")]);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    #[test]
+    fn unix_shell_suppresses_powerlevel10k_setup_wizard() {
+        let profile = ShellProfile { id: "default".into(), name: "Zsh".into(), is_default: true, executable: "/bin/zsh".into() };
+        assert_eq!(profile.command().get_env("POWERLEVEL9K_LAUNCHED_BY"), Some(std::ffi::OsStr::new("TIIIErminal")));
     }
 
     #[test]
