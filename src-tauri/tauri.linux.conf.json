@@ -1,7 +1,7 @@
 {
   "app": {
     "windows": [
-      { "title": "TIIIErminal", "decorations": true, "dragDropEnabled": false, "transparent": false, "width": 1100, "height": 720, "minWidth": 320, "minHeight": 420 }
+      { "title": "TIIIErminal", "decorations": true, "visible": false, "dragDropEnabled": false, "transparent": false, "width": 1100, "height": 720, "minWidth": 320, "minHeight": 420 }
     ]
   }
 }

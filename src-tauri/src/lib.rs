@@ -136,6 +136,21 @@ async fn get_fonts() -> Result<Vec<String>, String> {
 
 pub fn run() {
     tauri::Builder::default()
+        .setup(|_app| {
+            #[cfg(target_os = "linux")]
+            {
+                use gtk::prelude::{GtkWindowExt, WidgetExt};
+                use tauri::Manager;
+
+                let window = _app.get_webview_window("main").ok_or("Missing main window - set its label to main in the Linux configuration")?;
+                let titlebar = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                titlebar.set_no_show_all(true);
+                // Install before showing the window so GTK keeps the frame without a title bar.
+                window.gtk_window()?.set_titlebar(Some(&titlebar));
+                window.show()?;
+            }
+            Ok(())
+        })
         .manage(Sessions::default())
         .invoke_handler(tauri::generate_handler![open_terminal, write_terminal, resize_terminal, close_terminal, get_platform, get_profiles, get_fonts, read_clipboard, write_clipboard])
         .run(tauri::generate_context!())

@@ -4,7 +4,7 @@
 
 A compact terminal desktop app built with Angular 22, Tauri 2, xterm.js, and a native PTY. UI state uses signals and zoneless change detection.
 
-Tabs, settings, and window controls share one compact row. macOS uses traffic lights on the left; Windows and Linux use controls on the right. Drag the empty space in this row to move the window.
+Tabs, settings, and window controls share one compact row. macOS uses traffic lights on the left; Windows and Linux use controls on the right. Drag the empty space in this row to move the window. On Linux, a hidden GTK title-bar widget removes the native title bar while keeping GTK decorations and resizing enabled. The frame and shadows follow the GTK theme and desktop compositor.
 
 ## Requirements
 
