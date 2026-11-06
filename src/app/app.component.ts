@@ -48,6 +48,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   readonly fontSize = signal(13);
   readonly scale = signal(100);
   readonly backgroundOpacity = signal(100);
+  readonly effectiveBackgroundOpacity = computed((): number => this.platform() === 'linux' ? 100 : this.backgroundOpacity());
   readonly fontError = signal<string | undefined>(undefined);
   readonly tabMenu = signal<TabMenu | undefined>(undefined);
   readonly terminalMenu = signal<{ tabId: string; x: number; y: number; hasSelection: boolean } | undefined>(undefined);

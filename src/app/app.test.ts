@@ -43,11 +43,12 @@ mock.module('@tauri-apps/api/event', (): object => ({ listen: (name: string, cal
 } }));
 const openedDirectories: unknown[] = [];
 const clipboardWrites: string[] = [];
+let nativePlatform = 'windows';
 mock.module('@tauri-apps/api/core', (): object => ({ invoke: (command: string, args?: { text: string }): Promise<unknown> => {
   if (command === 'open_terminal') openedDirectories.push((args as unknown as { directory: unknown }).directory);
   if (command === 'read_clipboard') return Promise.resolve('first\nsecond');
   if (command === 'write_clipboard') { clipboardWrites.push(args!.text); return Promise.resolve(); }
-  if (command === 'get_platform') return Promise.resolve('windows');
+  if (command === 'get_platform') return Promise.resolve(nativePlatform);
   if (command === 'get_profiles') return Promise.resolve([{ id: 'pwsh', name: 'PowerShell 7', isDefault: true }, { id: 'powershell', name: 'Windows PowerShell', isDefault: false }]);
   if (command === 'get_fonts') return Promise.resolve(['Cascadia Mono', 'Consolas']);
   if (['open_terminal', 'close_terminal', 'resize_terminal', 'write_terminal'].includes(command)) return Promise.resolve();
@@ -87,6 +88,7 @@ TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
 let fixture: ReturnType<typeof TestBed.createComponent<InstanceType<typeof AppComponent>>>;
 
 beforeEach(async (): Promise<void> => {
+  nativePlatform = 'windows';
   windowActions.length = 0;
   clipboardWrites.length = 0;
   terminals.length = 0;
@@ -386,6 +388,7 @@ test('detected fonts appear after the native font query completes', async (): Pr
 test('new installations use and save the TIII editor terminal palette by default', (): void => {
   expect(fixture.componentInstance.theme()).toBe('TIII');
   expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-bg')).toBe('#222436');
+  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-fg')).toBe('#c8d3f5');
   expect(terminals[0].options.theme).toMatchObject({ background: '#00000000', foreground: '#c8d3f5', cursor: '#82aaff', cursorAccent: '#222436', selectionBackground: '#2d3f76', green: '#c3e88d', brightMagenta: '#c099ff' });
   expect(JSON.parse(localStorage.getItem('tiii-terminal-settings')!).theme).toBe('TIII');
 });
@@ -399,6 +402,7 @@ test('selecting a theme updates every terminal palette and new tabs inherit it',
   await click('Nord');
   for (const terminal of terminals) expect(terminal.options.theme).toEqual({ ...themes.Nord, background: '#00000000' });
   expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-bg')).toBe(themes.Nord.background);
+  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-fg')).toBe(themes.Nord.foreground);
   await click('Close settings');
   await click('New terminal tab');
   expect(terminals[2].options.theme).toEqual({ ...themes.Nord, background: '#00000000' });
@@ -429,7 +433,9 @@ test('changed settings are saved and restored before the first terminal opens af
   expect(localStorage.getItem('tiii-terminal-settings')).toBe(saved);
 });
 
-test('acrylic opacity changes the background without fading terminal text and survives restart', async (): Promise<void> => {
+test.each(['windows', 'macos'])('%s acrylic opacity changes the background without fading terminal text and survives restart', async (platform: string): Promise<void> => {
+  nativePlatform = platform;
+  fixture.componentInstance.platform.set(platform);
   await click('Settings');
   const input = fixture.nativeElement.querySelector('input[aria-label="Acrylic opacity"]') as HTMLInputElement;
   input.value = '65';
@@ -442,6 +448,23 @@ test('acrylic opacity changes the background without fading terminal text and su
   expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
   expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-opacity')).toBe('65%');
   expect(terminals[0].options.theme?.background).toBe('#00000000');
+});
+
+test('Linux opaque windows preserve the theme color without losing the saved opacity preference', async (): Promise<void> => {
+  await click('Settings');
+  const input = fixture.nativeElement.querySelector('input[aria-label="Acrylic opacity"]') as HTMLInputElement;
+  input.value = '65';
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+  await fixture.whenStable();
+  nativePlatform = 'linux';
+  await restartApp();
+  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-opacity')).toBe('100%');
+  expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
+  await click('Settings');
+  const restored = fixture.nativeElement.querySelector('input[aria-label="Acrylic opacity"]') as HTMLInputElement;
+  expect(restored.disabled).toBe(true);
+  expect(restored.value).toBe('100');
+  expect(JSON.parse(localStorage.getItem('tiii-terminal-settings')!).backgroundOpacity).toBe(65);
 });
 
 test('tabs restore their order, uploaded icons, groups, shell profiles, and active selection after restart', async (): Promise<void> => {
