@@ -1,5 +1,7 @@
 # TIIIErminal
 
+<img src="assets/logo/logo.png" width="96" alt="TIIIErminal TE monogram">
+
 A compact terminal desktop app built with Angular 22, Tauri 2, xterm.js, and a native PTY. UI state uses signals and zoneless change detection.
 
 Tabs, settings, and window controls share one compact row. macOS uses traffic lights on the left; Windows and Linux use controls on the right. Drag the empty space in this row to move the window.
