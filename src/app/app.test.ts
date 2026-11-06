@@ -383,8 +383,15 @@ test('detected fonts appear after the native font query completes', async (): Pr
   expect(fixture.nativeElement.textContent).toContain('2 installed font families');
 });
 
+test('new installations use and save the TIII editor terminal palette by default', (): void => {
+  expect(fixture.componentInstance.theme()).toBe('TIII');
+  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-bg')).toBe('#222436');
+  expect(terminals[0].options.theme).toMatchObject({ background: '#00000000', foreground: '#c8d3f5', cursor: '#82aaff', cursorAccent: '#222436', selectionBackground: '#2d3f76', green: '#c3e88d', brightMagenta: '#c099ff' });
+  expect(JSON.parse(localStorage.getItem('tiii-terminal-settings')!).theme).toBe('TIII');
+});
+
 test('selecting a theme updates every terminal palette and new tabs inherit it', async (): Promise<void> => {
-  expect(terminals[0].options.theme).toEqual({ ...themes.Dracula, background: '#00000000' });
+  expect(terminals[0].options.theme).toEqual({ ...themes.TIII, background: '#00000000' });
   expect(terminals[0].options.allowTransparency).toBe(true);
   await click('New terminal tab');
   await click('Settings');
@@ -430,7 +437,7 @@ test('acrylic opacity changes the background without fading terminal text and su
   await fixture.whenStable();
   expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-opacity')).toBe('65%');
   expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
-  expect(terminals[0].options.theme?.foreground).toBe(themes.Dracula.foreground);
+  expect(terminals[0].options.theme?.foreground).toBe(themes.TIII.foreground);
   await restartApp();
   expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
   expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-opacity')).toBe('65%');

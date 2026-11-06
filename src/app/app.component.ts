@@ -31,7 +31,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   private editingIconId = '';
   readonly themeNames = Object.keys(themes) as (keyof typeof themes)[];
   readonly groupColors = [{ name: 'Purple', value: '#b79aff' }, { name: 'Blue', value: '#78b6ff' }, { name: 'Green', value: '#75d8b1' }, { name: 'Yellow', value: '#f0c674' }, { name: 'Pink', value: '#f38ba8' }, { name: 'Gray', value: '#9ba5b7' }];
-  readonly theme = signal<keyof typeof themes>('Dracula');
+  readonly theme = signal<keyof typeof themes>('TIII');
   readonly tabs = signal<TerminalTab[]>([]);
   readonly groups = signal<TabGroup[]>([]);
   readonly closedTabs = signal<TerminalTab[]>([]);
