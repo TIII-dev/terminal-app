@@ -236,8 +236,8 @@ test('Linux clipboard shortcuts copy selections and paste through the terminal w
   expect(terminal.pasted).toHaveLength(1);
 });
 
-test('terminal context menu supports clipboard and buffer actions separately from tab actions', async (): Promise<void> => {
-  fixture.componentInstance.platform.set('linux');
+test.each(['windows', 'macos', 'linux'])('%s terminal context menu copies and pastes natively and keeps buffer and tab actions separate', async (platform: string): Promise<void> => {
+  fixture.componentInstance.platform.set(platform);
   const terminal = terminals[0];
   const open = async (): Promise<void> => {
     fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));

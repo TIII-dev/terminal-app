@@ -49,7 +49,7 @@ Tab numbers follow their left-to-right positions and update when tabs move, clos
 | Move tab left / right | Ctrl+Shift+PageUp / PageDown | Ctrl+Shift+PageUp / PageDown |
 | Close window | Ctrl+Shift+W | Cmd+Shift+W |
 
-Right-click the terminal for Copy, Paste, Select all, and Clear scrollback. Copy is disabled without a selection. Right-clicking a tab continues to show tab actions.
+Right-click the terminal for Copy, Paste, Select all, and Clear scrollback. Copy and Paste use the native system clipboard on every desktop platform, avoiding WebView clipboard permission prompts. Copy is disabled without a selection. Right-clicking a tab continues to show tab actions.
 
 On Linux, copy terminal selections with **Ctrl+Shift+C** and paste with **Ctrl+Shift+V**. **Ctrl+C** remains the shell interrupt shortcut. Pasting respects the terminal's bracketed paste mode.
 

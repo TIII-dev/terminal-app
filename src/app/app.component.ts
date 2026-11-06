@@ -263,11 +263,9 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     if (!terminal) return;
     try {
       if (action === 'copy' && terminal.hasSelection()) {
-        const text = terminal.getSelection();
-        if (this.platform() === 'linux') await invoke('write_clipboard', { text });
-        else await navigator.clipboard.writeText(text);
+        await invoke('write_clipboard', { text: terminal.getSelection() });
       } else if (action === 'paste') {
-        const text = this.platform() === 'linux' ? await invoke<string>('read_clipboard') : await navigator.clipboard.readText();
+        const text = await invoke<string>('read_clipboard');
         if (this.activeId() === menu.tabId && this.instances.get(menu.tabId)?.terminal === terminal) terminal.paste(text);
       } else if (action === 'select-all') terminal.selectAll();
       else if (action === 'clear') terminal.clear();

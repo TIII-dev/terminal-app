@@ -95,7 +95,7 @@ fn read_clipboard() -> Result<String, String> {
         Ok(gtk::Clipboard::get(&gtk::gdk::SELECTION_CLIPBOARD).wait_for_text().map(|text| text.to_string()).unwrap_or_default())
     }
     #[cfg(not(target_os = "linux"))]
-    Err("Native clipboard commands are only used on Linux".into())
+    arboard::Clipboard::new().and_then(|mut clipboard| clipboard.get_text()).map_err(|error| format!("Could not read clipboard - copy some text and try again: {error}"))
 }
 
 #[tauri::command]
@@ -109,8 +109,7 @@ fn write_clipboard(text: String) -> Result<(), String> {
     }
     #[cfg(not(target_os = "linux"))]
     {
-        let _ = text;
-        Err("Native clipboard commands are only used on Linux".into())
+        arboard::Clipboard::new().and_then(|mut clipboard| clipboard.set_text(text)).map_err(|error| format!("Could not write clipboard - try copying again: {error}"))
     }
 }
 
