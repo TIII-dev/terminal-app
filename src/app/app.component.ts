@@ -390,15 +390,23 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     this.tabMenu.set(undefined);
   }
 
+  allowTabDrop(event: DragEvent): void {
+    if (!event.dataTransfer?.types.includes('application/x-tiii-tab')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }
+
   dropTab(event: DragEvent, target: TerminalTab): void {
     event.preventDefault();
-    this.tabs.set(reorderTab(this.tabs(), event.dataTransfer!.getData('application/x-tiii-tab'), target.id));
+    if (!event.dataTransfer?.types.includes('application/x-tiii-tab')) return;
+    this.tabs.set(reorderTab(this.tabs(), event.dataTransfer.getData('application/x-tiii-tab'), target.id));
     this.removeEmptyGroups();
   }
 
   dropIntoGroup(event: DragEvent, group: TabGroup): void {
     event.preventDefault();
-    this.assignGroup(event.dataTransfer!.getData('application/x-tiii-tab'), group.id);
+    if (!event.dataTransfer?.types.includes('application/x-tiii-tab')) return;
+    this.assignGroup(event.dataTransfer.getData('application/x-tiii-tab'), group.id);
   }
 
   private removeEmptyGroups(): void {

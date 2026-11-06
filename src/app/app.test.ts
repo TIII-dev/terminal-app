@@ -11,7 +11,7 @@ import { readTabImage } from './terminal-tab/terminal-tab.image';
 const browser = new Window({ url: 'http://localhost:4200' });
 Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: browser.localStorage });
 Object.defineProperty(browser.document, 'fonts', { configurable: true, value: { load: (): Promise<FontFace[]> => Promise.resolve([]) } });
-for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'EventTarget', 'Event', 'MouseEvent', 'KeyboardEvent', 'ResizeObserver', 'File', 'FileReader', 'Image', 'requestAnimationFrame', 'cancelAnimationFrame'] as const) {
+for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'EventTarget', 'Event', 'MouseEvent', 'KeyboardEvent', 'DragEvent', 'DataTransfer', 'ResizeObserver', 'File', 'FileReader', 'Image', 'requestAnimationFrame', 'cancelAnimationFrame'] as const) {
   Object.defineProperty(globalThis, name, { configurable: true, value: name === 'window' ? browser : browser[name] });
 }
 await import('@angular/compiler');
@@ -114,6 +114,12 @@ const restartApp = async (): Promise<void> => {
   fixture = TestBed.createComponent(AppComponent);
   fixture.autoDetectChanges();
   await fixture.whenStable();
+};
+
+const createDragEvent = (type: string, dataTransfer: DataTransfer): DragEvent => {
+  const event = new DragEvent(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
+  return event;
 };
 
 test('the application runs without loading ZoneJS', (): void => {
@@ -281,6 +287,59 @@ test('moving a tab renumbers it while its icon and numeric shortcut follow the n
   fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true, bubbles: true, cancelable: true }));
   await fixture.whenStable();
   expect(fixture.nativeElement.querySelector('.tab--active').getAttribute('data-tab-id')).toBe(moved.id);
+});
+
+test.each(['windows', 'macos', 'linux'])('%s dragging tabs updates numbers, numeric hotkeys, and saved order', async (platform: string): Promise<void> => {
+  fixture.componentInstance.platform.set(platform);
+  await click('New terminal tab');
+  await click('New terminal tab');
+  const tabs = fixture.componentInstance.tabs();
+  const elements = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.tab'));
+  const transfer = new DataTransfer();
+  elements[0].querySelector('.tab__select')!.dispatchEvent(createDragEvent('dragstart', transfer));
+  const over = createDragEvent('dragover', transfer);
+  elements[2].dispatchEvent(over);
+  expect(over.defaultPrevented).toBe(true);
+  elements[2].dispatchEvent(createDragEvent('drop', transfer));
+  await fixture.whenStable();
+  const expected = [tabs[1], tabs[2], tabs[0]];
+  expect(fixture.componentInstance.tabs()).toEqual(expected);
+  expect(Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('.tab__select')).map((button): string => button.textContent.trim())).toEqual(['1', '2', '3']);
+  expect(fixture.nativeElement.querySelectorAll('.tab__close')[2].getAttribute('aria-label')).toBe('Close terminal 3');
+  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new KeyboardEvent('keydown', { key: '3', ctrlKey: platform !== 'macos', metaKey: platform === 'macos', bubbles: true, cancelable: true }));
+  await fixture.whenStable();
+  expect(fixture.componentInstance.activeId()).toBe(tabs[0].id);
+  await restartApp();
+  expect(fixture.componentInstance.tabs()).toEqual(expected);
+  expect(fixture.componentInstance.activeId()).toBe(tabs[0].id);
+});
+
+test('dropping on a group label adds the dragged tab to the group', async (): Promise<void> => {
+  await click('New terminal tab');
+  const [first, second] = fixture.componentInstance.tabs();
+  fixture.componentInstance.createGroup(first.id);
+  fixture.componentInstance.groupDialog.nativeElement.close();
+  await fixture.whenStable();
+  const transfer = new DataTransfer();
+  fixture.nativeElement.querySelector(`[data-tab-id="${second.id}"]`).dispatchEvent(createDragEvent('dragstart', transfer));
+  fixture.nativeElement.querySelector('.group_label').dispatchEvent(createDragEvent('drop', transfer));
+  await fixture.whenStable();
+  expect(fixture.componentInstance.tabs().map((tab): string => tab.id)).toEqual([first.id, second.id]);
+  expect(fixture.componentInstance.tabs().every((tab): boolean => tab.groupId === fixture.componentInstance.groups()[0].id)).toBe(true);
+});
+
+test('unrelated dragged content cannot reorder tabs', async (): Promise<void> => {
+  await click('New terminal tab');
+  const tabs = fixture.componentInstance.tabs();
+  const transfer = new DataTransfer();
+  transfer.setData('text/plain', tabs[0].id);
+  const target = fixture.nativeElement.querySelectorAll('.tab')[1] as HTMLElement;
+  const over = createDragEvent('dragover', transfer);
+  target.dispatchEvent(over);
+  expect(over.defaultPrevented).toBe(false);
+  target.dispatchEvent(createDragEvent('drop', transfer));
+  await fixture.whenStable();
+  expect(fixture.componentInstance.tabs()).toEqual(tabs);
 });
 
 test('closing a middle tab leaves consecutive numbers and new tabs continue the current order', async (): Promise<void> => {

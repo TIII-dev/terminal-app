@@ -54,6 +54,6 @@ export const reorderTab = (tabs: TerminalTab[], tabId: string, targetId: string)
   if (!source || !target) throw new Error('Unknown tab - drag an open terminal tab');
   if (tabId === targetId) return tabs;
   const remaining = tabs.filter(tab => tab.id !== tabId);
-  remaining.splice(remaining.findIndex(tab => tab.id === targetId), 0, { ...source, groupId: target.groupId });
+  remaining.splice(tabs.indexOf(target), 0, { ...source, groupId: target.groupId });
   return remaining;
 };

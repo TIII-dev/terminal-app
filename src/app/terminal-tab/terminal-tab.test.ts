@@ -45,7 +45,16 @@ describe('tab groups', (): void => {
   });
   test('dropping onto a grouped tab moves and groups the dragged tab', (): void => {
     const result = reorderTab([tab('1', null), tab('2', 'work'), tab('3', 'work')], '1', '3');
-    expect(result.map(item => [item.id, item.groupId])).toEqual([['2', 'work'], ['1', 'work'], ['3', 'work']]);
+    expect(result.map(item => [item.id, item.groupId])).toEqual([['2', 'work'], ['3', 'work'], ['1', 'work']]);
+  });
+  test('dragging right moves the tab to the target position, including adjacent and final positions', (): void => {
+    expect(reorderTab([tab('1', null), tab('2', null)], '1', '2').map((item): string => item.id)).toEqual(['2', '1']);
+    expect(reorderTab([tab('1', null), tab('2', null), tab('3', null)], '1', '3').map((item): string => item.id)).toEqual(['2', '3', '1']);
+  });
+  test('dragging left moves the tab before the target and dropping on itself keeps the order', (): void => {
+    const tabs = [tab('1', null), tab('2', null), tab('3', null)];
+    expect(reorderTab(tabs, '3', '1').map((item): string => item.id)).toEqual(['3', '1', '2']);
+    expect(reorderTab(tabs, '2', '2')).toEqual(tabs);
   });
   test('unknown dragged tabs are rejected', (): void => {
     expect(() => reorderTab([tab('1', null)], 'missing', '1')).toThrow('Unknown tab');
