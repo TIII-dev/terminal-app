@@ -289,6 +289,12 @@ test('moving a tab renumbers it while its icon and numeric shortcut follow the n
   expect(fixture.nativeElement.querySelector('.tab--active').getAttribute('data-tab-id')).toBe(moved.id);
 });
 
+test.each([0, 1, 2])('tab mouse button %i only cancels middle-button autoscroll', (button: number): void => {
+  const event = new MouseEvent('mousedown', { button, bubbles: true, cancelable: true });
+  fixture.nativeElement.querySelector('.tab__select').dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(button === 1);
+});
+
 test.each(['windows', 'macos', 'linux'])('%s dragging tabs updates numbers, numeric hotkeys, and saved order', async (platform: string): Promise<void> => {
   fixture.componentInstance.platform.set(platform);
   await click('New terminal tab');
