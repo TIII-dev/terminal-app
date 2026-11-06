@@ -1,6 +1,6 @@
 # TIIIErminal
 
-<img src="assets/logo/logo.png" width="96" alt="TIIIErminal TE monogram with terminal prompt and block cursor">
+<img src="assets/logo/logo.png" width="96" alt="TIIIErminal mint terminal prompt and block cursor">
 
 A compact terminal desktop app built with Angular 22, Tauri 2, xterm.js, and a native PTY. UI state uses signals and zoneless change detection.
 
