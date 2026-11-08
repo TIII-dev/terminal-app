@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 
 import { read, run } from './release.command';
 import { getBuildKey, getLatestTag, getPlatform, getTagVersion, getVersion, resolveWithin } from './release.utils';
+import { updateNativeVersions } from './release.version';
 
 test.each([
   ['win32', 'windows', 'build:windows'], ['darwin', 'macos', 'build:macos'], ['linux', 'linux', 'build:linux'],
@@ -41,4 +42,19 @@ test('subprocess failures stop the release and captured output is returned on su
   expect(await read([process.execPath, '-e', 'process.stdout.write("ready")'], process.cwd())).toBe('ready');
   await expect(read([process.execPath, '-e', 'process.stderr.write("missing compiler");process.exit(2)'], process.cwd())).rejects.toThrow('missing compiler');
   await expect(run([process.execPath, '-e', 'process.exit(2)'], process.cwd())).rejects.toThrow('failed');
+});
+
+test('npm version changes keep native versions aligned without changing dependency versions', (): void => {
+  const result = updateNativeVersions({
+    config: '{"version":"0.1.0","productName":"TIIIErminal"}',
+    cargo: '[package]\nname = "tiii-terminal-app"\nversion = "0.1.0"\n[dependencies]\ntauri = "2"\n',
+    lock: '[[package]]\nname = "other"\nversion = "9.0.0"\n\n[[package]]\nname = "tiii-terminal-app"\nversion = "0.1.0"\n',
+  }, '0.2.0');
+  expect(JSON.parse(result.config)).toEqual({ version: '0.2.0', productName: 'TIIIErminal' });
+  expect(result.cargo).toContain('version = "0.2.0"');
+  expect(result.cargo).toContain('tauri = "2"');
+  expect(result.lock).toContain('name = "other"\nversion = "9.0.0"');
+  expect(result.lock).toContain('name = "tiii-terminal-app"\nversion = "0.2.0"');
+  expect((): unknown => updateNativeVersions({ config: '{}', cargo: '', lock: '' }, '0.2.0')).toThrow('Missing package version');
+  expect((): unknown => updateNativeVersions({ config: '{"version":"0.1.0"}', cargo: '', lock: '' }, '0.2.0')).toThrow('Missing native package version');
 });

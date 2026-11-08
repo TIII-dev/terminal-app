@@ -14,3 +14,5 @@ export type ReleaseManifest = {
   architecture: string;
   files: ReleaseFile[];
 };
+
+export type NativeVersions = { config: string; cargo: string; lock: string };

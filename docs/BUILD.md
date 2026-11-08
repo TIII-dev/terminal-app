@@ -17,6 +17,8 @@ Building uses an isolated checkout of the highest stable version tag and writes 
 
 See [build script](../scripts/build-last-tagged-version/build-last-tagged-version.md) and [publish script](../scripts/publish-last-tagged-version/publish-last-tagged-version.md) for prerequisites, signing, browser dependencies, and exact outputs. macOS/Windows signing credentials remain the standard Tauri build environment's responsibility.
 
+Future version bumps use `@tertium/gith`: `bun run release:patch` from `main`, or `bun run release:minor` / `bun run release:major` from `develop`. These explicitly enable npm version updates and perform gith's Git release flow. The npm `version` hook synchronizes Tauri, Cargo.toml, and the app's Cargo.lock entry before npm commits and tags the new version. These commands do not build installers; run the tagged build and publisher afterward on each platform.
+
 ## Missing WebKitGTK 4.1 (Linux)
 
 If the build fails with:

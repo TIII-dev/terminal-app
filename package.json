@@ -2,7 +2,9 @@
   "name": "tiii-terminal-app",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": "^22.22.3 || ^24.15.0 || >=26.0.0" },
+  "engines": {
+    "node": "^22.22.3 || ^24.15.0 || >=26.0.0"
+  },
   "scripts": {
     "dev": "ng serve",
     "build:frontend": "ng build",
@@ -11,6 +13,10 @@
     "build:linux": "tauri build --bundles deb,rpm,appimage -- --locked",
     "build:last-tag": "bun scripts/build-last-tagged-version/build-last-tagged-version.ts",
     "publish:last-tag": "bun scripts/publish-last-tagged-version/publish-last-tagged-version.ts",
+    "release:patch": "gith release --patch --update-version --npm",
+    "release:minor": "gith release --minor --update-version --npm",
+    "release:major": "gith release --major --update-version --npm",
+    "version": "bun scripts/release/release.version.ts",
     "install:linux": "bash scripts/install-linux.sh",
     "install:linux:arch": "npm run install:linux",
     "test": "bun test src scripts",
@@ -32,13 +38,14 @@
     "tslib": "^2.8.1"
   },
   "devDependencies": {
-    "@types/bun": "^1.4.4",
-    "playwright": "^1.65.0",
     "@angular/build": "^22.2.4",
     "@angular/cli": "^22.2.4",
     "@angular/compiler-cli": "^22.2.3",
     "@tauri-apps/cli": "^2.0.0",
+    "@tertium/gith": "^0.5.0",
+    "@types/bun": "^1.4.4",
     "happy-dom": "^21.0.4",
+    "playwright": "^1.65.0",
     "typescript": "~6.0.0"
   }
 }
