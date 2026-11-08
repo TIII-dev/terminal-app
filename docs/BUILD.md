@@ -2,6 +2,21 @@
 
 Troubleshooting for building and running TIIIErminal from source. For first-time setup, see [INSTALLATION.md](INSTALLATION.md).
 
+## Standard builds and tagged releases
+
+The normal build is Tauri's standard release pipeline: `build:frontend` compiles Angular, Tauri reads `frontendDist`, Cargo compiles the native app, and Tauri bundles the platform installers. The `build:windows`, `build:macos`, and `build:linux` commands use native bundlers and Cargo's lockfile. Run each on its matching operating system. Output stays in `src-tauri/target/release/bundle/`; no custom binary copying or app packaging framework is involved.
+
+For repeatable tagged releases, set the same version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, update their lockfiles, commit, then create and push a stable tag such as `v0.1.0`. Run the following separately on each OS:
+
+```sh
+bun run build:last-tag
+bun run publish:last-tag
+```
+
+Building uses an isolated checkout of the highest stable version tag and writes installers plus a checksum manifest under `docs/releases/<tag>/artifacts/<platform>-<architecture>/`. It also automatically creates `docs/releases/<tag>/screenshots/` with captures of the tagged app's themes and settings, using illustrative shell output. Previous files for that platform are replaced; other platform assets are retained. Publishing verifies the build/tag/checksums and creates or updates the same GitHub release without deleting the other platforms' assets. No tag or release is created by the build step.
+
+See [build script](../scripts/build-last-tagged-version/build-last-tagged-version.md) and [publish script](../scripts/publish-last-tagged-version/publish-last-tagged-version.md) for prerequisites, signing, browser dependencies, and exact outputs. macOS/Windows signing credentials remain the standard Tauri build environment's responsibility.
+
 ## Missing WebKitGTK 4.1 (Linux)
 
 If the build fails with:

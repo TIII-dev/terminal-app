@@ -5,13 +5,17 @@
   "engines": { "node": "^22.22.3 || ^24.15.0 || >=26.0.0" },
   "scripts": {
     "dev": "ng serve",
-    "build:windows": "tauri build --bundles nsis,msi",
-    "build:macos": "tauri build --bundles app,dmg",
-    "build:linux": "tauri build --bundles deb,rpm,appimage",
+    "build:frontend": "ng build",
+    "build:windows": "tauri build --bundles nsis,msi -- --locked",
+    "build:macos": "tauri build --bundles app,dmg -- --locked",
+    "build:linux": "tauri build --bundles deb,rpm,appimage -- --locked",
+    "build:last-tag": "bun scripts/build-last-tagged-version/build-last-tagged-version.ts",
+    "publish:last-tag": "bun scripts/publish-last-tagged-version/publish-last-tagged-version.ts",
     "install:linux": "bash scripts/install-linux.sh",
     "install:linux:arch": "npm run install:linux",
-    "test": "bun test src",
-    "format:ts": "bun fmt --single-quote \"src/**/*.ts\"",
+    "test": "bun test src scripts",
+    "typecheck:scripts": "tsc --project tsconfig.scripts.json",
+    "format:ts": "bun fmt --single-quote \"src/**/*.ts\" \"scripts/**/*.ts\"",
     "format:css": "bun fmt \"src/**/*.css\"",
     "format:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",
     "tauri:dev": "tauri dev"
@@ -28,6 +32,8 @@
     "tslib": "^2.8.1"
   },
   "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "playwright": "^1.65.0",
     "@angular/build": "^22.2.4",
     "@angular/cli": "^22.2.4",
     "@angular/compiler-cli": "^22.2.3",

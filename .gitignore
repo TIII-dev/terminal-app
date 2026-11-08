@@ -4,3 +4,5 @@
 /.angular
 /src-tauri/target
 /src-tauri/gen
+/.release-worktrees
+/docs/releases/*/artifacts
