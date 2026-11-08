@@ -438,10 +438,10 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   }
 
   async setFont(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement;
-    input.setCustomValidity(input.value === 'monospace' || this.fonts().includes(input.value) ? '' : 'Choose an installed font from the list');
-    if (!input.reportValidity()) return;
-    this.fontFamily.set(input.value);
+    const select = event.target as HTMLSelectElement;
+    select.setCustomValidity(select.value === 'monospace' || this.fonts().includes(select.value) ? '' : 'Choose an installed font from the list');
+    if (!select.reportValidity()) return;
+    this.fontFamily.set(select.value);
     await this.applyFont();
     this.saveSettings();
   }

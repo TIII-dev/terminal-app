@@ -379,10 +379,21 @@ test('reopening a tab replaces its icon if another open tab already owns it', as
   expect(Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('.tab__select')).map((button): string => button.textContent.trim())).toEqual(['1', '2']);
 });
 
-test('detected fonts appear after the native font query completes', async (): Promise<void> => {
+test('the font dropdown shows every detected font even when a font is selected', async (): Promise<void> => {
   await click('Settings');
   expect(Array.from<HTMLOptionElement>(fixture.nativeElement.querySelectorAll('#installed-fonts option')).map((option): string => option.value)).toEqual(['monospace', 'Cascadia Mono', 'Consolas']);
   expect(fixture.nativeElement.textContent).toContain('2 installed font families');
+  const select = fixture.nativeElement.querySelector('#installed-fonts') as HTMLSelectElement;
+  select.value = 'Consolas';
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  await fixture.whenStable();
+  expect(fixture.componentInstance.fontFamily()).toBe('Consolas');
+  expect(terminals[0].options.fontFamily).toBe('"Consolas"');
+  expect(Array.from(select.options).map((option): string => option.value)).toEqual(['monospace', 'Cascadia Mono', 'Consolas']);
+  select.value = 'monospace';
+  select.dispatchEvent(new Event('change', { bubbles: true }));
+  await fixture.whenStable();
+  expect(fixture.componentInstance.fontFamily()).toBe('monospace');
 });
 
 test('new installations use and save the TIII editor terminal palette by default', (): void => {
@@ -413,8 +424,8 @@ test('changed settings are saved and restored before the first terminal opens af
   const profile = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
   profile.value = 'powershell';
   profile.dispatchEvent(new Event('change', { bubbles: true }));
-  for (const [selector, value] of [['input[list]', 'Consolas'], ['input[min="8"]', '16'], ['input[min="50"]', '125']]) {
-    const input = fixture.nativeElement.querySelector(selector) as HTMLInputElement;
+  for (const [selector, value] of [['#installed-fonts', 'Consolas'], ['input[min="8"]', '16'], ['input[min="50"]', '125']]) {
+    const input = fixture.nativeElement.querySelector(selector) as HTMLInputElement | HTMLSelectElement;
     input.value = value;
     input.dispatchEvent(new Event('change', { bubbles: true }));
     await fixture.whenStable();
