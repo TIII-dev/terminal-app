@@ -412,11 +412,17 @@ test('selecting a theme updates every terminal palette and new tabs inherit it',
   await click('Theme');
   await click('Nord');
   for (const terminal of terminals) expect(terminal.options.theme).toEqual({ ...themes.Nord, background: '#00000000' });
-  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-bg')).toBe(themes.Nord.background);
+  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-bg')).toBe('#2e3440');
   expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-fg')).toBe(themes.Nord.foreground);
   await click('Close settings');
   await click('New terminal tab');
   expect(terminals[2].options.theme).toEqual({ ...themes.Nord, background: '#00000000' });
+});
+
+test('built-in themes use their standard backgrounds', (): void => {
+  expect(Object.fromEntries(Object.entries(themes).map(([name, theme]) => [name, theme.background]))).toEqual({
+    TIII: '#222436', Dracula: '#282a36', 'Tokyo Night': '#1a1b26', Catppuccin: '#1e1e2e', Nord: '#2e3440', Gruvbox: '#282828'
+  });
 });
 
 test('changed settings are saved and restored before the first terminal opens after restart', async (): Promise<void> => {
