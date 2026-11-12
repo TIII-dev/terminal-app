@@ -1,0 +1,33 @@
+type: desktop-app
+slug: tiii-terminal-app
+identifier: app.tiii.terminal
+display_name:
+  en: TIIIErminal
+summary:
+  en: A compact terminal that keeps your shells organized and your workspace your own.
+description:
+  en: |
+    Work in your preferred shell with tabs you can organize into named, colored groups.
+    Choose themes, fonts, and tab icons to make the terminal yours. Your layout and
+    settings are saved locally, ready for you when you return.
+languages:
+  - en
+default_language: en
+code_languages:
+  - TypeScript
+  - Rust
+frameworks:
+  - Angular
+  - Tauri
+icon: assets/logo/logo.png
+team:
+  - name: TIII
+    roles:
+      - owner
+    github: TIII-dev
+distribution:
+  - github-releases
+platforms:
+  windows:
+  macos:
+  linux:

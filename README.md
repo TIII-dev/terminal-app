@@ -2,9 +2,18 @@
 
 <img src="assets/logo/logo.png" width="96" alt="TIIIErminal lavender terminal prompt and mint block cursor">
 
-A compact terminal desktop app built with Angular 22, Tauri 2, xterm.js, and a native PTY. UI state uses signals and zoneless change detection.
+A compact terminal that keeps your shells organized and your workspace your own.
 
 Tabs, settings, and window controls share one compact row. macOS uses traffic lights on the left; Windows and Linux use controls on the right. Drag the empty space in this row to move the window. On Linux, a hidden GTK title-bar widget removes the native title bar while keeping GTK decorations and resizing enabled. The frame and shadows follow the GTK theme and desktop compositor.
+
+## Features
+
+- **Your choice of shell:** Run PowerShell 7 on Windows or detected shells such as Zsh, Bash, and Fish on macOS and Linux. Each tab runs an independent shell.
+- **Tabs and groups:** Reorder tabs, organize them into named, colored groups, and choose built-in icons or upload your own images.
+- **A familiar layout:** Tab order, icons, shell profiles, groups, the active tab, and settings are saved locally. Restarting opens fresh shells in the saved layout.
+- **Themes throughout:** Choose TIII, Dracula, Tokyo Night, Catppuccin, Nord, or Gruvbox for the terminal and interface.
+- **Personalized appearance:** Choose an installed font, adjust font size and interface scale, and control the background tint on Windows and macOS.
+- **Keyboard and clipboard:** Manage tabs with shortcuts, use native clipboard actions, and paste into applications that use bracketed paste mode.
 
 ## Requirements
 
@@ -16,10 +25,10 @@ Tabs, settings, and window controls share one compact row. macOS uses traffic li
 
 ```sh
 bun install
-bun run tauri:dev
+bun run dev:tauri
 ```
 
-Run the frontend alone with `bun run dev`. Build desktop bundles on the corresponding operating system with `bun run build:windows` (NSIS/MSI), `bun run build:macos` (app/DMG), or `bun run build:linux` (Deb/RPM/AppImage). The app is named TIIIErminal; its executable is `tiiierminal.exe` on Windows and `tiiierminal` on macOS/Linux.
+Run the frontend alone with `bun run dev`. Build desktop bundles on the corresponding operating system with `bun run build:windows` (NSIS/MSI), `bun run build:macos` (app/DMG), or `bun run build:linux` (Deb/RPM/AppImage). Bundles are available in `dist/bundles/`. The app is named TIIIErminal; its executable is `tiiierminal.exe` on Windows and `tiiierminal` on macOS/Linux.
 
 For a release, run `bun run build:last-tag` and then `bun run publish:last-tag` separately on each platform. The build uses the highest stable version tag in an isolated checkout and automatically creates `docs/releases/<tag>/screenshots/`. Publishing adds this platform's installers and screenshots to the same GitHub release, replacing matching files while keeping other platforms' assets. See [tagged release builds](docs/BUILD.md#standard-builds-and-tagged-releases) for prerequisites and outputs. Create and push a version tag before publishing; these commands never invent a release tag.
 
@@ -29,11 +38,11 @@ The application menu contains Settings and About. Settings → Main includes she
 
 Profiles affect new tabs; existing sessions keep their shell. Windows also detects Windows PowerShell and Command Prompt from PATH. macOS and Linux also detect installed Zsh, Bash, Fish, and POSIX shells in their standard system locations. Scrollbars are thin and follow the terminal theme.
 
-Format source files with `bun run format:ts`, `bun run format:css`, and `bun run format:rs`. TypeScript and CSS use Bun's built-in formatter; Rust uses rustfmt through Cargo.
+Format source files with `bun run fix:ts`, `bun run fix:css`, and `bun run fix:rs`. TypeScript and CSS use Bun's built-in formatter; Rust uses rustfmt through Cargo.
 
 ## Install an existing Linux build
 
-Run `npm run install:linux` (or `npm run install:linux:arch` on Arch/CachyOS). This installs the existing `src-tauri/target/release/tiiierminal` binary to `~/.local/bin` and adds an application-menu launcher and icon under `${XDG_DATA_HOME:-~/.local/share}`. No rebuild or sudo is needed. The system must already have the Tauri Linux runtime dependencies installed.
+Run `npm run install:linux`. This installs the existing `src-tauri/target/release/tiiierminal` binary to `~/.local/bin` and adds an application-menu launcher and icon under `${XDG_DATA_HOME:-~/.local/share}`. No rebuild or sudo is needed. The system must already have the Tauri Linux runtime dependencies installed.
 
 Run the command again after building to update the installed app. Add `~/.local/bin` to your `PATH` to launch it as `tiiierminal` from a shell.
 
@@ -58,3 +67,5 @@ Right-click the terminal for Copy, Paste, Select all, and Clear scrollback. Copy
 On Linux, copy terminal selections with **Ctrl+Shift+C** and paste with **Ctrl+Shift+V**. **Ctrl+C** remains the shell interrupt shortcut. Pasting respects the terminal's bracketed paste mode.
 
 Reopening a closed tab starts a fresh shell; it does not restore the terminated process. Run the UI and tab behavior tests with `bun test` and the Rust tests with `cargo test --manifest-path src-tauri/Cargo.toml --lib`. UI tests run zoneless with native async functions and mock the native window and terminal-rendering boundaries.
+
+TIIIErminal is licensed under the MIT License. It uses third-party software that is subject to its own licenses.
