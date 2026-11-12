@@ -3,6 +3,7 @@ name = "tiii-terminal-app"
 version = "0.1.0"
 description = "A compact cross-platform terminal"
 authors = ["TIII"]
+license = "MIT"
 edition = "2021"
 
 [lib]

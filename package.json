@@ -7,10 +7,9 @@
   },
   "scripts": {
     "dev": "ng serve",
-    "build:frontend": "ng build",
-    "build:windows": "tauri build --bundles nsis,msi -- --locked",
-    "build:macos": "tauri build --bundles app,dmg -- --locked",
-    "build:linux": "tauri build --bundles deb,rpm,appimage -- --locked",
+    "build:windows": "tauri build --bundles nsis,msi -- --locked && bun scripts/copy-bundles/copy-bundles.ts",
+    "build:macos": "tauri build --bundles app,dmg -- --locked && bun scripts/copy-bundles/copy-bundles.ts",
+    "build:linux": "tauri build --bundles deb,rpm,appimage -- --locked && bun scripts/copy-bundles/copy-bundles.ts",
     "build:last-tag": "bun scripts/build-last-tagged-version/build-last-tagged-version.ts",
     "publish:last-tag": "bun scripts/publish-last-tagged-version/publish-last-tagged-version.ts",
     "release:patch": "gith release --patch --update-version --npm",
@@ -18,13 +17,19 @@
     "release:major": "gith release --major --update-version --npm",
     "version": "bun scripts/release/release.version.ts",
     "install:linux": "bash scripts/install-linux.sh",
-    "install:linux:arch": "npm run install:linux",
     "test": "bun test src scripts",
-    "typecheck:scripts": "tsc --project tsconfig.scripts.json",
-    "format:ts": "bun fmt --single-quote \"src/**/*.ts\" \"scripts/**/*.ts\"",
-    "format:css": "bun fmt \"src/**/*.css\"",
-    "format:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",
-    "tauri:dev": "tauri dev"
+    "prepare": "git config core.hooksPath .githooks",
+    "build": "ng build",
+    "typecheck": "tsc --noEmit --project tsconfig.app.json && tsc --project tsconfig.scripts.json",
+    "lint": "bun run lint:ts && bun run lint:css && bun run lint:rs",
+    "lint:ts": "bun fmt --check --single-quote \"src/**/*.ts\" \"scripts/**/*.ts\"",
+    "lint:css": "bun fmt --check \"src/**/*.css\"",
+    "lint:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+    "fix": "bun run fix:ts && bun run fix:css && bun run fix:rs",
+    "fix:ts": "bun fmt --single-quote \"src/**/*.ts\" \"scripts/**/*.ts\"",
+    "fix:css": "bun fmt \"src/**/*.css\"",
+    "fix:rs": "cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "dev:tauri": "tauri dev"
   },
   "dependencies": {
     "@angular/common": "^22.2.3",
@@ -47,5 +52,21 @@
     "happy-dom": "^21.0.4",
     "playwright": "^1.65.0",
     "typescript": "~6.0.0"
-  }
+  },
+  "description": "A compact terminal that keeps your shells organized and your workspace your own.",
+  "author": {
+    "name": "TIII",
+    "url": "https://github.com/TIII-dev"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TIII-dev/terminal-app.git"
+  },
+  "homepage": "https://github.com/TIII-dev/terminal-app#readme",
+  "keywords": [
+    "terminal",
+    "shell",
+    "desktop"
+  ]
 }

@@ -4,7 +4,7 @@ Troubleshooting for building and running TIIIErminal from source. For first-time
 
 ## Standard builds and tagged releases
 
-The normal build is Tauri's standard release pipeline: `build:frontend` compiles Angular, Tauri reads `frontendDist`, Cargo compiles the native app, and Tauri bundles the platform installers. The `build:windows`, `build:macos`, and `build:linux` commands use native bundlers and Cargo's lockfile. Run each on its matching operating system. Output stays in `src-tauri/target/release/bundle/`; no custom binary copying or app packaging framework is involved.
+The normal build is Tauri's standard release pipeline: `build` compiles Angular, Tauri reads `frontendDist`, Cargo compiles the native app, and Tauri bundles the platform installers. The `build:windows`, `build:macos`, and `build:linux` commands use native bundlers and Cargo's lockfile. Run each on its matching operating system. Bundles are copied to `dist/bundles/` by format; Tauri also keeps its originals in `src-tauri/target/release/bundle/`. Existing bundles are not removed.
 
 For repeatable tagged releases, set the same version in `package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`, update their lockfiles, commit, then create and push a stable tag such as `v0.1.0`. Run the following separately on each OS:
 

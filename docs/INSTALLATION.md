@@ -65,7 +65,7 @@ bun install
 ## Run in development
 
 ```sh
-bun run tauri:dev
+bun run dev:tauri
 ```
 
 To run only the Angular frontend in a browser, use `bun run dev`. The frontend alone does not start the native PTY, so terminals will not work in that mode.
@@ -80,7 +80,7 @@ Build on the operating system you are targeting:
 | macOS | `bun run build:macos` | `.app`, DMG |
 | Linux | `bun run build:linux` | Deb, RPM, AppImage |
 
-Bundles are written under `src-tauri/target/release/bundle/`.
+Bundles are copied to `dist/bundles/` by format.
 
 ## Verify the installation
 

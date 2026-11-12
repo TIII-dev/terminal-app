@@ -2,6 +2,6 @@
 
 This module owns the native platform commands, stable-version tag validation, artifact identity, output path boundaries, streaming file hashes, and command execution shared by tagged builds and publishing. `release.constants.ts` fixes the GitHub destination to `tiii-dev/terminal-app`. `release.types.ts` defines the on-disk manifest written next to a platform's artifacts.
 
-Run `bun test scripts` for release checks and `bun run typecheck:scripts` for strict TypeScript validation. Full usage is documented beside the build and publishing entry points. No helper reads or stores GitHub tokens or signing credentials.
+Run `bun test scripts` for release checks and `bun run typecheck` for strict TypeScript validation. Full usage is documented beside the build and publishing entry points. No helper reads or stores GitHub tokens or signing credentials.
 
 `release.version.ts` is the npm `version` lifecycle entry used by the gith release commands. It reads the new package version, updates Tauri and Cargo version fields, and stages those three native files for npm's version commit. It preserves dependency versions and fails if the native package entries are missing.
