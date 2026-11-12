@@ -9,60 +9,144 @@ import { tabIcons } from './terminal-tab/terminal-tab.constants';
 import { readTabImage } from './terminal-tab/terminal-tab.image';
 
 const browser = new Window({ url: 'http://localhost:4200' });
-Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: browser.localStorage });
-Object.defineProperty(browser.document, 'fonts', { configurable: true, value: { load: (): Promise<FontFace[]> => Promise.resolve([]) } });
-for (const name of ['window', 'document', 'navigator', 'HTMLElement', 'Element', 'Node', 'EventTarget', 'Event', 'MouseEvent', 'KeyboardEvent', 'DragEvent', 'DataTransfer', 'ResizeObserver', 'File', 'FileReader', 'Image', 'requestAnimationFrame', 'cancelAnimationFrame'] as const) {
-  Object.defineProperty(globalThis, name, { configurable: true, value: name === 'window' ? browser : browser[name] });
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: browser.localStorage,
+});
+Object.defineProperty(browser.document, 'fonts', {
+  configurable: true,
+  value: { load: (): Promise<FontFace[]> => Promise.resolve([]) },
+});
+for (const name of [
+  'window',
+  'document',
+  'navigator',
+  'HTMLElement',
+  'Element',
+  'Node',
+  'EventTarget',
+  'Event',
+  'MouseEvent',
+  'KeyboardEvent',
+  'DragEvent',
+  'DataTransfer',
+  'ResizeObserver',
+  'File',
+  'FileReader',
+  'Image',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+] as const) {
+  Object.defineProperty(globalThis, name, {
+    configurable: true,
+    value: name === 'window' ? browser : browser[name],
+  });
 }
 await import('@angular/compiler');
 
-plugin({ setup(build): void {
-  build.onLoad({ filter: /app\.component\.ts$/ }, (args): { contents: string; loader: 'ts' } => ({
-    contents: readFileSync(args.path, 'utf8')
-      .replace("templateUrl: './app.component.html'", `template: ${JSON.stringify(readFileSync(new URL('./app.component.html', import.meta.url), 'utf8'))}`)
-      .replace("styleUrl: './app.component.css'", 'styles: []'),
-    loader: 'ts',
-  }));
-} });
+plugin({
+  setup(build): void {
+    build.onLoad(
+      { filter: /app\.component\.ts$/ },
+      (args): { contents: string; loader: 'ts' } => ({
+        contents: readFileSync(args.path, 'utf8')
+          .replace(
+            "templateUrl: './app.component.html'",
+            `template: ${JSON.stringify(readFileSync(new URL('./app.component.html', import.meta.url), 'utf8'))}`,
+          )
+          .replace("styleUrl: './app.component.css'", 'styles: []'),
+        loader: 'ts',
+      }),
+    );
+  },
+});
 
 const windowActions: string[] = [];
-const action = (name: string): Promise<void> => { windowActions.push(name); return Promise.resolve(); };
-mock.module('@tauri-apps/api/window', (): object => ({ getCurrentWindow: (): object => ({
-  minimize: (): Promise<void> => action('minimize'),
-  toggleMaximize: (): Promise<void> => action('maximize'),
-  close: (): Promise<void> => action('close'),
-  isFullscreen: (): Promise<boolean> => Promise.resolve(false),
-  setFullscreen: (): Promise<void> => action('fullscreen'),
-}) }));
-mock.module('@tauri-apps/api/app', (): object => ({ getVersion: (): Promise<string> => Promise.resolve('0.1.0') }));
-mock.module('@tauri-apps/api/webview', (): object => ({ getCurrentWebview: (): object => ({ setZoom: (): Promise<void> => action('zoom') }) }));
-const eventListeners = new Map<string, (event: { payload: { id: string; directory: string } }) => void>();
-mock.module('@tauri-apps/api/event', (): object => ({ listen: (name: string, callback: (event: { payload: { id: string; directory: string } }) => void): Promise<() => void> => {
-  eventListeners.set(name, callback);
-  return Promise.resolve((): void => { eventListeners.delete(name); });
-} }));
+const action = (name: string): Promise<void> => {
+  windowActions.push(name);
+  return Promise.resolve();
+};
+mock.module('@tauri-apps/api/window', (): object => ({
+  getCurrentWindow: (): object => ({
+    minimize: (): Promise<void> => action('minimize'),
+    toggleMaximize: (): Promise<void> => action('maximize'),
+    close: (): Promise<void> => action('close'),
+    isFullscreen: (): Promise<boolean> => Promise.resolve(false),
+    setFullscreen: (): Promise<void> => action('fullscreen'),
+  }),
+}));
+mock.module('@tauri-apps/api/app', (): object => ({
+  getVersion: (): Promise<string> => Promise.resolve('0.1.0'),
+}));
+mock.module('@tauri-apps/api/webview', (): object => ({
+  getCurrentWebview: (): object => ({
+    setZoom: (): Promise<void> => action('zoom'),
+  }),
+}));
+const eventListeners = new Map<
+  string,
+  (event: { payload: { id: string; directory: string } }) => void
+>();
+mock.module('@tauri-apps/api/event', (): object => ({
+  listen: (
+    name: string,
+    callback: (event: { payload: { id: string; directory: string } }) => void,
+  ): Promise<() => void> => {
+    eventListeners.set(name, callback);
+    return Promise.resolve((): void => {
+      eventListeners.delete(name);
+    });
+  },
+}));
 const openedDirectories: unknown[] = [];
 const clipboardWrites: string[] = [];
 let nativePlatform = 'windows';
-mock.module('@tauri-apps/api/core', (): object => ({ invoke: (command: string, args?: { text: string }): Promise<unknown> => {
-  if (command === 'open_terminal') openedDirectories.push((args as unknown as { directory: unknown }).directory);
-  if (command === 'read_clipboard') return Promise.resolve('first\nsecond');
-  if (command === 'write_clipboard') { clipboardWrites.push(args!.text); return Promise.resolve(); }
-  if (command === 'get_platform') return Promise.resolve(nativePlatform);
-  if (command === 'get_profiles') return Promise.resolve([{ id: 'pwsh', name: 'PowerShell 7', isDefault: true }, { id: 'powershell', name: 'Windows PowerShell', isDefault: false }]);
-  if (command === 'get_fonts') return Promise.resolve(['Cascadia Mono', 'Consolas']);
-  if (['open_terminal', 'close_terminal', 'resize_terminal', 'write_terminal'].includes(command)) return Promise.resolve();
-  throw new Error(`Unexpected native command: ${command}`);
-} }));
+mock.module('@tauri-apps/api/core', (): object => ({
+  invoke: (command: string, args?: { text: string }): Promise<unknown> => {
+    if (command === 'open_terminal')
+      openedDirectories.push(
+        (args as unknown as { directory: unknown }).directory,
+      );
+    if (command === 'read_clipboard') return Promise.resolve('first\nsecond');
+    if (command === 'write_clipboard') {
+      clipboardWrites.push(args!.text);
+      return Promise.resolve();
+    }
+    if (command === 'get_platform') return Promise.resolve(nativePlatform);
+    if (command === 'get_profiles')
+      return Promise.resolve([
+        { id: 'pwsh', name: 'PowerShell 7', isDefault: true },
+        { id: 'powershell', name: 'Windows PowerShell', isDefault: false },
+      ]);
+    if (command === 'get_fonts')
+      return Promise.resolve(['Cascadia Mono', 'Consolas']);
+    if (
+      [
+        'open_terminal',
+        'close_terminal',
+        'resize_terminal',
+        'write_terminal',
+      ].includes(command)
+    )
+      return Promise.resolve();
+    throw new Error(`Unexpected native command: ${command}`);
+  },
+}));
 
 const terminals: TerminalSurface[] = [];
 class TerminalSurface {
   readonly cols = 80;
   readonly rows = 24;
   readonly options: ITerminalOptions;
-  constructor(options: ITerminalOptions) { this.options = options; terminals.push(this); }
+  constructor(options: ITerminalOptions) {
+    this.options = options;
+    terminals.push(this);
+  }
   element: HTMLDivElement | undefined;
-  open(host: HTMLElement): void { this.element = document.createElement('div'); host.appendChild(this.element); }
+  open(host: HTMLElement): void {
+    this.element = document.createElement('div');
+    host.appendChild(this.element);
+  }
   loadAddon(): void {}
   onData(): void {}
   onResize(): void {}
@@ -71,21 +155,40 @@ class TerminalSurface {
   refresh(): void {}
   selection = '';
   readonly pasted: string[] = [];
-  hasSelection(): boolean { return this.selection.length > 0; }
-  getSelection(): string { return this.selection; }
-  paste(text: string): void { this.pasted.push(text); }
-  selectAll(): void { this.selection = 'all output'; }
-  clear(): void { this.selection = ''; }
-  dispose(): void { this.element?.remove(); }
+  hasSelection(): boolean {
+    return this.selection.length > 0;
+  }
+  getSelection(): string {
+    return this.selection;
+  }
+  paste(text: string): void {
+    this.pasted.push(text);
+  }
+  selectAll(): void {
+    this.selection = 'all output';
+  }
+  clear(): void {
+    this.selection = '';
+  }
+  dispose(): void {
+    this.element?.remove();
+  }
 }
 mock.module('@xterm/xterm', (): object => ({ Terminal: TerminalSurface }));
-mock.module('@xterm/addon-fit', (): object => ({ FitAddon: class { fit(): void {} } }));
+mock.module('@xterm/addon-fit', (): object => ({
+  FitAddon: class {
+    fit(): void {}
+  },
+}));
 
 const { TestBed } = await import('@angular/core/testing');
-const { BrowserTestingModule, platformBrowserTesting } = await import('@angular/platform-browser/testing');
+const { BrowserTestingModule, platformBrowserTesting } =
+  await import('@angular/platform-browser/testing');
 const { AppComponent } = await import('./app.component');
 TestBed.initTestEnvironment(BrowserTestingModule, platformBrowserTesting());
-let fixture: ReturnType<typeof TestBed.createComponent<InstanceType<typeof AppComponent>>>;
+let fixture: ReturnType<
+  typeof TestBed.createComponent<InstanceType<typeof AppComponent>>
+>;
 
 beforeEach(async (): Promise<void> => {
   nativePlatform = 'windows';
@@ -99,11 +202,20 @@ beforeEach(async (): Promise<void> => {
   fixture.autoDetectChanges();
   await fixture.whenStable();
 });
-afterEach((): void => { TestBed.resetTestingModule(); mock.restore(); });
+afterEach((): void => {
+  TestBed.resetTestingModule();
+  mock.restore();
+});
 
 const click = async (label: string): Promise<void> => {
-  const buttons = Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('button'));
-  const button = buttons.find((button): boolean => button.getAttribute('aria-label') === label || button.textContent.trim() === label);
+  const buttons = Array.from<HTMLButtonElement>(
+    fixture.nativeElement.querySelectorAll('button'),
+  );
+  const button = buttons.find(
+    (button): boolean =>
+      button.getAttribute('aria-label') === label ||
+      button.textContent.trim() === label,
+  );
   if (!button) throw new Error(`Missing button: ${label}`);
   button.click();
   await fixture.whenStable();
@@ -118,7 +230,10 @@ const restartApp = async (): Promise<void> => {
   await fixture.whenStable();
 };
 
-const createDragEvent = (type: string, dataTransfer: DataTransfer): DragEvent => {
+const createDragEvent = (
+  type: string,
+  dataTransfer: DataTransfer,
+): DragEvent => {
   const event = new DragEvent(type, { bubbles: true, cancelable: true });
   Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
   return event;
@@ -130,13 +245,19 @@ test('the application runs without loading ZoneJS', (): void => {
 
 test('the tab context menu opens an icon picker and selecting a preset updates that tab', async (): Promise<void> => {
   const selected = fixture.componentInstance.tabs()[0];
-  fixture.nativeElement.querySelector('.tab').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  fixture.nativeElement
+    .querySelector('.tab')
+    .dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+    );
   await fixture.whenStable();
   await click('Edit icon');
   expect(fixture.componentInstance.iconDialog.nativeElement.open).toBe(true);
   const index = tabIcons.findIndex((icon): boolean => icon !== selected.icon);
   await click(`Choose icon ${index + 1}`);
-  expect(fixture.nativeElement.querySelector('.tab__icon path').getAttribute('d')).toBe(tabIcons[index]);
+  expect(
+    fixture.nativeElement.querySelector('.tab__icon path').getAttribute('d'),
+  ).toBe(tabIcons[index]);
   expect(fixture.componentInstance.iconDialog.nativeElement.open).toBe(false);
 });
 
@@ -146,18 +267,31 @@ test('SVG, JPG, and PNG uploads render as tab images and survive moving and reop
   const id = fixture.componentInstance.tabs()[1].id;
   for (const type of ['image/svg+xml', 'image/jpeg', 'image/png']) {
     fixture.componentInstance.openIconEditor(id);
-    const input = fixture.nativeElement.querySelector('input[type="file"]') as HTMLInputElement;
-    Object.defineProperty(input, 'files', { configurable: true, value: [new File(['image bytes'], 'icon', { type })] });
-    await fixture.componentInstance.uploadTabIcon({ target: input } as unknown as Event);
+    const input = fixture.nativeElement.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [new File(['image bytes'], 'icon', { type })],
+    });
+    await fixture.componentInstance.uploadTabIcon({
+      target: input,
+    } as unknown as Event);
     await fixture.whenStable();
-    expect(fixture.nativeElement.querySelector('.tab--active img').getAttribute('src')).toStartWith(`data:${type};base64,`);
+    expect(
+      fixture.nativeElement
+        .querySelector('.tab--active img')
+        .getAttribute('src'),
+    ).toStartWith(`data:${type};base64,`);
   }
   const icon = fixture.componentInstance.tabs()[1].icon;
   fixture.componentInstance.moveActiveTab(-1);
   await fixture.componentInstance.closeTab(id);
   await fixture.componentInstance.reopenTab();
   await fixture.whenStable();
-  expect(fixture.nativeElement.querySelector('.tab--active img').getAttribute('src')).toBe(icon);
+  expect(
+    fixture.nativeElement.querySelector('.tab--active img').getAttribute('src'),
+  ).toBe(icon);
 });
 
 test('icons belonging to another open tab cannot be selected in the picker', async (): Promise<void> => {
@@ -166,7 +300,9 @@ test('icons belonging to another open tab cannot be selected in the picker', asy
   fixture.componentInstance.openIconEditor(tabs[1].id);
   await fixture.whenStable();
   const index = tabIcons.indexOf(tabs[0].icon);
-  const button = fixture.nativeElement.querySelector(`[aria-label="Choose icon ${index + 1}"]`) as HTMLButtonElement;
+  const button = fixture.nativeElement.querySelector(
+    `[aria-label="Choose icon ${index + 1}"]`,
+  ) as HTMLButtonElement;
   expect(button.disabled).toBe(true);
   button.click();
   expect(fixture.componentInstance.tabs()[1].icon).toBe(tabs[1].icon);
@@ -174,22 +310,45 @@ test('icons belonging to another open tab cannot be selected in the picker', asy
 
 test('unsupported, empty, and undecodable images are rejected without changing the tab icon', async (): Promise<void> => {
   const icon = fixture.componentInstance.tabs()[0].icon;
-  fixture.componentInstance.openIconEditor(fixture.componentInstance.tabs()[0].id);
-  await expect(readTabImage(new File(['text'], 'icon.txt', { type: 'text/plain' }))).rejects.toThrow('Unsupported icon');
-  await expect(readTabImage(new File([], 'icon.png', { type: 'image/png' }))).rejects.toThrow('Unsupported icon');
-  spyOn(browser.HTMLImageElement.prototype, 'decode').mockRejectedValue(new Error('Invalid image'));
-  const input = fixture.nativeElement.querySelector('input[type="file"]') as HTMLInputElement;
-  Object.defineProperty(input, 'files', { value: [new File(['broken'], 'icon.png', { type: 'image/png' })] });
-  await expect(fixture.componentInstance.uploadTabIcon({ target: input } as unknown as Event)).rejects.toThrow('Invalid icon image');
+  fixture.componentInstance.openIconEditor(
+    fixture.componentInstance.tabs()[0].id,
+  );
+  await expect(
+    readTabImage(new File(['text'], 'icon.txt', { type: 'text/plain' })),
+  ).rejects.toThrow('Unsupported icon');
+  await expect(
+    readTabImage(new File([], 'icon.png', { type: 'image/png' })),
+  ).rejects.toThrow('Unsupported icon');
+  spyOn(browser.HTMLImageElement.prototype, 'decode').mockRejectedValue(
+    new Error('Invalid image'),
+  );
+  const input = fixture.nativeElement.querySelector(
+    'input[type="file"]',
+  ) as HTMLInputElement;
+  Object.defineProperty(input, 'files', {
+    value: [new File(['broken'], 'icon.png', { type: 'image/png' })],
+  });
+  await expect(
+    fixture.componentInstance.uploadTabIcon({
+      target: input,
+    } as unknown as Event),
+  ).rejects.toThrow('Invalid icon image');
   await fixture.whenStable();
   expect(fixture.componentInstance.tabs()[0].icon).toBe(icon);
-  expect(fixture.nativeElement.querySelector('.dialog--icon [role="alert"]').textContent).toContain('Invalid icon image');
+  expect(
+    fixture.nativeElement.querySelector('.dialog--icon [role="alert"]')
+      .textContent,
+  ).toContain('Invalid icon image');
 });
 
 test('asynchronous startup displays the first tab and window controls without another click', (): void => {
   expect(fixture.nativeElement.querySelectorAll('.tab').length).toBe(1);
-  expect(fixture.nativeElement.querySelector('.tab__select').textContent.trim()).toBe('1');
-  expect(fixture.nativeElement.querySelectorAll('.window_controls__button').length).toBe(3);
+  expect(
+    fixture.nativeElement.querySelector('.tab__select').textContent.trim(),
+  ).toBe('1');
+  expect(
+    fixture.nativeElement.querySelectorAll('.window_controls__button').length,
+  ).toBe(3);
 });
 
 test('closing a tab updates the strip after the native close completes', async (): Promise<void> => {
@@ -197,19 +356,39 @@ test('closing a tab updates the strip after the native close completes', async (
   expect(fixture.nativeElement.querySelectorAll('.tab').length).toBe(2);
   await click('Close terminal 2');
   expect(fixture.nativeElement.querySelectorAll('.tab').length).toBe(1);
-  expect(fixture.nativeElement.querySelector('[aria-selected="true"]').textContent.trim()).toBe('1');
+  expect(
+    fixture.nativeElement
+      .querySelector('[aria-selected="true"]')
+      .textContent.trim(),
+  ).toBe('1');
 });
 
 test('native keyboard shortcuts open and switch tabs in the rendered strip', async (): Promise<void> => {
-  const event = new KeyboardEvent('keydown', { key: 't', ctrlKey: true, bubbles: true, cancelable: true });
+  const event = new KeyboardEvent('keydown', {
+    key: 't',
+    ctrlKey: true,
+    bubbles: true,
+    cancelable: true,
+  });
   fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(event);
   await fixture.whenStable();
   expect(event.defaultPrevented).toBe(true);
   expect(fixture.componentInstance.tabs().length).toBe(2);
   expect(fixture.nativeElement.querySelectorAll('.tab').length).toBe(2);
-  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true, bubbles: true, cancelable: true }));
+  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: '1',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
   await fixture.whenStable();
-  expect(fixture.nativeElement.querySelector('[aria-selected="true"]').textContent.trim()).toBe('1');
+  expect(
+    fixture.nativeElement
+      .querySelector('[aria-selected="true"]')
+      .textContent.trim(),
+  ).toBe('1');
 });
 
 test('window buttons request minimize, maximize and close on the native window', async (): Promise<void> => {
@@ -224,7 +403,13 @@ test('Linux clipboard shortcuts copy selections and paste through the terminal w
   const terminal = terminals[0];
   const host = fixture.nativeElement.querySelector('.terminal_host');
   const press = (key: string, shiftKey = true): KeyboardEvent => {
-    const event = new KeyboardEvent('keydown', { key, ctrlKey: true, shiftKey, bubbles: true, cancelable: true });
+    const event = new KeyboardEvent('keydown', {
+      key,
+      ctrlKey: true,
+      shiftKey,
+      bubbles: true,
+      cancelable: true,
+    });
     host.dispatchEvent(event);
     return event;
   };
@@ -244,83 +429,167 @@ test('Linux clipboard shortcuts copy selections and paste through the terminal w
   expect(terminal.pasted).toHaveLength(1);
 });
 
-test.each(['windows', 'macos', 'linux'])('%s terminal context menu copies and pastes natively and keeps buffer and tab actions separate', async (platform: string): Promise<void> => {
-  fixture.componentInstance.platform.set(platform);
-  const terminal = terminals[0];
-  const open = async (): Promise<void> => {
-    fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+test.each(['windows', 'macos', 'linux'])(
+  '%s terminal context menu copies and pastes natively and keeps buffer and tab actions separate',
+  async (platform: string): Promise<void> => {
+    fixture.componentInstance.platform.set(platform);
+    const terminal = terminals[0];
+    const open = async (): Promise<void> => {
+      fixture.nativeElement
+        .querySelector('.terminal_host')
+        .dispatchEvent(
+          new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+        );
+      await fixture.whenStable();
+    };
+    await open();
+    expect(
+      fixture.nativeElement.querySelector(
+        '[aria-label="Terminal actions"] button',
+      ).disabled,
+    ).toBe(true);
+    terminal.selection = 'selected output';
+    await open();
+    await click('Copy');
+    expect(clipboardWrites).toEqual(['selected output']);
+    expect(fixture.componentInstance.terminalMenu()).toBeUndefined();
+    await open();
+    await click('Paste');
+    expect(terminal.pasted).toEqual(['first\nsecond']);
+    await open();
+    await click('Select all');
+    expect(terminal.selection).toBe('all output');
+    await open();
+    await click('Clear scrollback');
+    expect(terminal.selection).toBe('');
+    await open();
+    fixture.nativeElement
+      .querySelector('[aria-label="Terminal actions"]')
+      .dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
     await fixture.whenStable();
-  };
-  await open();
-  expect(fixture.nativeElement.querySelector('[aria-label="Terminal actions"] button').disabled).toBe(true);
-  terminal.selection = 'selected output';
-  await open();
-  await click('Copy');
-  expect(clipboardWrites).toEqual(['selected output']);
-  expect(fixture.componentInstance.terminalMenu()).toBeUndefined();
-  await open();
-  await click('Paste');
-  expect(terminal.pasted).toEqual(['first\nsecond']);
-  await open();
-  await click('Select all');
-  expect(terminal.selection).toBe('all output');
-  await open();
-  await click('Clear scrollback');
-  expect(terminal.selection).toBe('');
-  await open();
-  fixture.nativeElement.querySelector('[aria-label="Terminal actions"]').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }));
-  await fixture.whenStable();
-  expect(fixture.componentInstance.terminalMenu()).toBeUndefined();
-  await open();
-  fixture.nativeElement.querySelector('.tab').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-  await fixture.whenStable();
-  expect(fixture.nativeElement.querySelector('[aria-label="Terminal actions"]')).toBeNull();
-  expect(fixture.nativeElement.querySelector('[aria-label="Tab actions"]')).not.toBeNull();
-});
+    expect(fixture.componentInstance.terminalMenu()).toBeUndefined();
+    await open();
+    fixture.nativeElement
+      .querySelector('.tab')
+      .dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+      );
+    await fixture.whenStable();
+    expect(
+      fixture.nativeElement.querySelector('[aria-label="Terminal actions"]'),
+    ).toBeNull();
+    expect(
+      fixture.nativeElement.querySelector('[aria-label="Tab actions"]'),
+    ).not.toBeNull();
+  },
+);
 
 test('moving a tab renumbers it while its icon and numeric shortcut follow the new position', async (): Promise<void> => {
   await click('New terminal tab');
   const moved = fixture.componentInstance.tabs()[1];
-  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new KeyboardEvent('keydown', { key: 'PageUp', ctrlKey: true, shiftKey: true, bubbles: true, cancelable: true }));
+  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: 'PageUp',
+      ctrlKey: true,
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
   await fixture.whenStable();
-  expect(Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('.tab__select')).map((button): string => button.textContent.trim())).toEqual(['1', '2']);
-  expect(fixture.nativeElement.querySelector('.tab').getAttribute('data-tab-id')).toBe(moved.id);
-  expect(fixture.nativeElement.querySelector('.tab__icon path').getAttribute('d')).toBe(moved.icon);
-  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new KeyboardEvent('keydown', { key: '1', ctrlKey: true, bubbles: true, cancelable: true }));
+  expect(
+    Array.from<HTMLButtonElement>(
+      fixture.nativeElement.querySelectorAll('.tab__select'),
+    ).map((button): string => button.textContent.trim()),
+  ).toEqual(['1', '2']);
+  expect(
+    fixture.nativeElement.querySelector('.tab').getAttribute('data-tab-id'),
+  ).toBe(moved.id);
+  expect(
+    fixture.nativeElement.querySelector('.tab__icon path').getAttribute('d'),
+  ).toBe(moved.icon);
+  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: '1',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
   await fixture.whenStable();
-  expect(fixture.nativeElement.querySelector('.tab--active').getAttribute('data-tab-id')).toBe(moved.id);
+  expect(
+    fixture.nativeElement
+      .querySelector('.tab--active')
+      .getAttribute('data-tab-id'),
+  ).toBe(moved.id);
 });
 
-test.each([0, 1, 2])('tab mouse button %i only cancels middle-button autoscroll', (button: number): void => {
-  const event = new MouseEvent('mousedown', { button, bubbles: true, cancelable: true });
-  fixture.nativeElement.querySelector('.tab__select').dispatchEvent(event);
-  expect(event.defaultPrevented).toBe(button === 1);
-});
+test.each([0, 1, 2])(
+  'tab mouse button %i only cancels middle-button autoscroll',
+  (button: number): void => {
+    const event = new MouseEvent('mousedown', {
+      button,
+      bubbles: true,
+      cancelable: true,
+    });
+    fixture.nativeElement.querySelector('.tab__select').dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(button === 1);
+  },
+);
 
-test.each(['windows', 'macos', 'linux'])('%s dragging tabs updates numbers, numeric hotkeys, and saved order', async (platform: string): Promise<void> => {
-  fixture.componentInstance.platform.set(platform);
-  await click('New terminal tab');
-  await click('New terminal tab');
-  const tabs = fixture.componentInstance.tabs();
-  const elements = Array.from<HTMLElement>(fixture.nativeElement.querySelectorAll('.tab'));
-  const transfer = new DataTransfer();
-  elements[0].querySelector('.tab__select')!.dispatchEvent(createDragEvent('dragstart', transfer));
-  const over = createDragEvent('dragover', transfer);
-  elements[2].dispatchEvent(over);
-  expect(over.defaultPrevented).toBe(true);
-  elements[2].dispatchEvent(createDragEvent('drop', transfer));
-  await fixture.whenStable();
-  const expected = [tabs[1], tabs[2], tabs[0]];
-  expect(fixture.componentInstance.tabs()).toEqual(expected);
-  expect(Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('.tab__select')).map((button): string => button.textContent.trim())).toEqual(['1', '2', '3']);
-  expect(fixture.nativeElement.querySelectorAll('.tab__close')[2].getAttribute('aria-label')).toBe('Close terminal 3');
-  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new KeyboardEvent('keydown', { key: '3', ctrlKey: platform !== 'macos', metaKey: platform === 'macos', bubbles: true, cancelable: true }));
-  await fixture.whenStable();
-  expect(fixture.componentInstance.activeId()).toBe(tabs[0].id);
-  await restartApp();
-  expect(fixture.componentInstance.tabs()).toEqual(expected);
-  expect(fixture.componentInstance.activeId()).toBe(tabs[0].id);
-});
+test.each(['windows', 'macos', 'linux'])(
+  '%s dragging tabs updates numbers, numeric hotkeys, and saved order',
+  async (platform: string): Promise<void> => {
+    fixture.componentInstance.platform.set(platform);
+    await click('New terminal tab');
+    await click('New terminal tab');
+    const tabs = fixture.componentInstance.tabs();
+    const elements = Array.from<HTMLElement>(
+      fixture.nativeElement.querySelectorAll('.tab'),
+    );
+    const transfer = new DataTransfer();
+    elements[0]
+      .querySelector('.tab__select')!
+      .dispatchEvent(createDragEvent('dragstart', transfer));
+    const over = createDragEvent('dragover', transfer);
+    elements[2].dispatchEvent(over);
+    expect(over.defaultPrevented).toBe(true);
+    elements[2].dispatchEvent(createDragEvent('drop', transfer));
+    await fixture.whenStable();
+    const expected = [tabs[1], tabs[2], tabs[0]];
+    expect(fixture.componentInstance.tabs()).toEqual(expected);
+    expect(
+      Array.from<HTMLButtonElement>(
+        fixture.nativeElement.querySelectorAll('.tab__select'),
+      ).map((button): string => button.textContent.trim()),
+    ).toEqual(['1', '2', '3']);
+    expect(
+      fixture.nativeElement
+        .querySelectorAll('.tab__close')[2]
+        .getAttribute('aria-label'),
+    ).toBe('Close terminal 3');
+    fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: '3',
+        ctrlKey: platform !== 'macos',
+        metaKey: platform === 'macos',
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+    await fixture.whenStable();
+    expect(fixture.componentInstance.activeId()).toBe(tabs[0].id);
+    await restartApp();
+    expect(fixture.componentInstance.tabs()).toEqual(expected);
+    expect(fixture.componentInstance.activeId()).toBe(tabs[0].id);
+  },
+);
 
 test('dropping on a group label adds the dragged tab to the group', async (): Promise<void> => {
   await click('New terminal tab');
@@ -329,11 +598,24 @@ test('dropping on a group label adds the dragged tab to the group', async (): Pr
   fixture.componentInstance.groupDialog.nativeElement.close();
   await fixture.whenStable();
   const transfer = new DataTransfer();
-  fixture.nativeElement.querySelector(`[data-tab-id="${second.id}"]`).dispatchEvent(createDragEvent('dragstart', transfer));
-  fixture.nativeElement.querySelector('.group_label').dispatchEvent(createDragEvent('drop', transfer));
+  fixture.nativeElement
+    .querySelector(`[data-tab-id="${second.id}"]`)
+    .dispatchEvent(createDragEvent('dragstart', transfer));
+  fixture.nativeElement
+    .querySelector('.group_label')
+    .dispatchEvent(createDragEvent('drop', transfer));
   await fixture.whenStable();
-  expect(fixture.componentInstance.tabs().map((tab): string => tab.id)).toEqual([first.id, second.id]);
-  expect(fixture.componentInstance.tabs().every((tab): boolean => tab.groupId === fixture.componentInstance.groups()[0].id)).toBe(true);
+  expect(fixture.componentInstance.tabs().map((tab): string => tab.id)).toEqual(
+    [first.id, second.id],
+  );
+  expect(
+    fixture.componentInstance
+      .tabs()
+      .every(
+        (tab): boolean =>
+          tab.groupId === fixture.componentInstance.groups()[0].id,
+      ),
+  ).toBe(true);
 });
 
 test('unrelated dragged content cannot reorder tabs', async (): Promise<void> => {
@@ -341,7 +623,9 @@ test('unrelated dragged content cannot reorder tabs', async (): Promise<void> =>
   const tabs = fixture.componentInstance.tabs();
   const transfer = new DataTransfer();
   transfer.setData('text/plain', tabs[0].id);
-  const target = fixture.nativeElement.querySelectorAll('.tab')[1] as HTMLElement;
+  const target = fixture.nativeElement.querySelectorAll(
+    '.tab',
+  )[1] as HTMLElement;
   const over = createDragEvent('dragover', transfer);
   target.dispatchEvent(over);
   expect(over.defaultPrevented).toBe(false);
@@ -354,18 +638,39 @@ test('closing a middle tab leaves consecutive numbers and new tabs continue the 
   await click('New terminal tab');
   await click('New terminal tab');
   await click('Close terminal 2');
-  expect(Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('.tab__select')).map((button): string => button.textContent.trim())).toEqual(['1', '2']);
+  expect(
+    Array.from<HTMLButtonElement>(
+      fixture.nativeElement.querySelectorAll('.tab__select'),
+    ).map((button): string => button.textContent.trim()),
+  ).toEqual(['1', '2']);
   await click('New terminal tab');
-  expect(Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('.tab__select')).map((button): string => button.textContent.trim())).toEqual(['1', '2', '3']);
+  expect(
+    Array.from<HTMLButtonElement>(
+      fixture.nativeElement.querySelectorAll('.tab__select'),
+    ).map((button): string => button.textContent.trim()),
+  ).toEqual(['1', '2', '3']);
 });
 
 test('more tabs than preset icons stay unique and shortcut nine selects number nine', async (): Promise<void> => {
   for (let index = 1; index < 12; index++) await click('New terminal tab');
-  const icons = Array.from<SVGPathElement>(fixture.nativeElement.querySelectorAll('.tab__icon path')).map((path): string | null => path.getAttribute('d'));
+  const icons = Array.from<SVGPathElement>(
+    fixture.nativeElement.querySelectorAll('.tab__icon path'),
+  ).map((path): string | null => path.getAttribute('d'));
   expect(new Set(icons).size).toBe(12);
-  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(new KeyboardEvent('keydown', { key: '9', ctrlKey: true, bubbles: true, cancelable: true }));
+  fixture.nativeElement.querySelector('.terminal_host').dispatchEvent(
+    new KeyboardEvent('keydown', {
+      key: '9',
+      ctrlKey: true,
+      bubbles: true,
+      cancelable: true,
+    }),
+  );
   await fixture.whenStable();
-  expect(fixture.nativeElement.querySelector('[aria-selected="true"]').textContent.trim()).toBe('9');
+  expect(
+    fixture.nativeElement
+      .querySelector('[aria-selected="true"]')
+      .textContent.trim(),
+  ).toBe('9');
 });
 
 test('reopening a tab replaces its icon if another open tab already owns it', async (): Promise<void> => {
@@ -376,20 +681,34 @@ test('reopening a tab replaces its icon if another open tab already owns it', as
   const tabs = fixture.componentInstance.tabs();
   expect(tabs[0].icon).toBe(original.icon);
   expect(tabs[1].icon).not.toBe(original.icon);
-  expect(Array.from<HTMLButtonElement>(fixture.nativeElement.querySelectorAll('.tab__select')).map((button): string => button.textContent.trim())).toEqual(['1', '2']);
+  expect(
+    Array.from<HTMLButtonElement>(
+      fixture.nativeElement.querySelectorAll('.tab__select'),
+    ).map((button): string => button.textContent.trim()),
+  ).toEqual(['1', '2']);
 });
 
 test('the font dropdown shows every detected font even when a font is selected', async (): Promise<void> => {
   await click('Settings');
-  expect(Array.from<HTMLOptionElement>(fixture.nativeElement.querySelectorAll('#installed-fonts option')).map((option): string => option.value)).toEqual(['monospace', 'Cascadia Mono', 'Consolas']);
-  expect(fixture.nativeElement.textContent).toContain('2 installed font families');
-  const select = fixture.nativeElement.querySelector('#installed-fonts') as HTMLSelectElement;
+  expect(
+    Array.from<HTMLOptionElement>(
+      fixture.nativeElement.querySelectorAll('#installed-fonts option'),
+    ).map((option): string => option.value),
+  ).toEqual(['monospace', 'Cascadia Mono', 'Consolas']);
+  expect(fixture.nativeElement.textContent).toContain(
+    '2 installed font families',
+  );
+  const select = fixture.nativeElement.querySelector(
+    '#installed-fonts',
+  ) as HTMLSelectElement;
   select.value = 'Consolas';
   select.dispatchEvent(new Event('change', { bubbles: true }));
   await fixture.whenStable();
   expect(fixture.componentInstance.fontFamily()).toBe('Consolas');
   expect(terminals[0].options.fontFamily).toBe('"Consolas"');
-  expect(Array.from(select.options).map((option): string => option.value)).toEqual(['monospace', 'Cascadia Mono', 'Consolas']);
+  expect(
+    Array.from(select.options).map((option): string => option.value),
+  ).toEqual(['monospace', 'Cascadia Mono', 'Consolas']);
   select.value = 'monospace';
   select.dispatchEvent(new Event('change', { bubbles: true }));
   await fixture.whenStable();
@@ -398,40 +717,92 @@ test('the font dropdown shows every detected font even when a font is selected',
 
 test('new installations use and save the TIII editor terminal palette by default', (): void => {
   expect(fixture.componentInstance.theme()).toBe('TIII');
-  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-bg')).toBe('#222436');
-  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-fg')).toBe('#c8d3f5');
-  expect(terminals[0].options.theme).toMatchObject({ background: '#00000000', foreground: '#c8d3f5', cursor: '#82aaff', cursorAccent: '#222436', selectionBackground: '#2d3f76', green: '#c3e88d', brightMagenta: '#c099ff' });
-  expect(JSON.parse(localStorage.getItem('tiii-terminal-settings')!).theme).toBe('TIII');
+  expect(
+    fixture.nativeElement
+      .querySelector('.shell')
+      .style.getPropertyValue('--terminal-bg'),
+  ).toBe('#222436');
+  expect(
+    fixture.nativeElement
+      .querySelector('.shell')
+      .style.getPropertyValue('--terminal-fg'),
+  ).toBe('#c8d3f5');
+  expect(terminals[0].options.theme).toMatchObject({
+    background: '#00000000',
+    foreground: '#c8d3f5',
+    cursor: '#82aaff',
+    cursorAccent: '#222436',
+    selectionBackground: '#2d3f76',
+    green: '#c3e88d',
+    brightMagenta: '#c099ff',
+  });
+  expect(
+    JSON.parse(localStorage.getItem('tiii-terminal-settings')!).theme,
+  ).toBe('TIII');
 });
 
 test('selecting a theme updates every terminal palette and new tabs inherit it', async (): Promise<void> => {
-  expect(terminals[0].options.theme).toEqual({ ...themes.TIII, background: '#00000000' });
+  expect(terminals[0].options.theme).toEqual({
+    ...themes.TIII,
+    background: '#00000000',
+  });
   expect(terminals[0].options.allowTransparency).toBe(true);
   await click('New terminal tab');
   await click('Settings');
   await click('Theme');
   await click('Nord');
-  for (const terminal of terminals) expect(terminal.options.theme).toEqual({ ...themes.Nord, background: '#00000000' });
-  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-bg')).toBe('#2e3440');
-  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-fg')).toBe(themes.Nord.foreground);
+  for (const terminal of terminals)
+    expect(terminal.options.theme).toEqual({
+      ...themes.Nord,
+      background: '#00000000',
+    });
+  expect(
+    fixture.nativeElement
+      .querySelector('.shell')
+      .style.getPropertyValue('--terminal-bg'),
+  ).toBe('#2e3440');
+  expect(
+    fixture.nativeElement
+      .querySelector('.shell')
+      .style.getPropertyValue('--terminal-fg'),
+  ).toBe(themes.Nord.foreground);
   await click('Close settings');
   await click('New terminal tab');
-  expect(terminals[2].options.theme).toEqual({ ...themes.Nord, background: '#00000000' });
+  expect(terminals[2].options.theme).toEqual({
+    ...themes.Nord,
+    background: '#00000000',
+  });
 });
 
 test('built-in themes use their standard backgrounds', (): void => {
-  expect(Object.fromEntries(Object.entries(themes).map(([name, theme]) => [name, theme.background]))).toEqual({
-    TIII: '#222436', Dracula: '#282a36', 'Tokyo Night': '#1a1b26', Catppuccin: '#1e1e2e', Nord: '#2e3440', Gruvbox: '#282828'
+  expect(
+    Object.fromEntries(
+      Object.entries(themes).map(([name, theme]) => [name, theme.background]),
+    ),
+  ).toEqual({
+    TIII: '#222436',
+    Dracula: '#282a36',
+    'Tokyo Night': '#1a1b26',
+    Catppuccin: '#1e1e2e',
+    Nord: '#2e3440',
+    Gruvbox: '#282828',
   });
 });
 
 test('changed settings are saved and restored before the first terminal opens after restart', async (): Promise<void> => {
   await click('Settings');
-  const profile = fixture.nativeElement.querySelector('select') as HTMLSelectElement;
+  const profile = fixture.nativeElement.querySelector(
+    'select',
+  ) as HTMLSelectElement;
   profile.value = 'powershell';
   profile.dispatchEvent(new Event('change', { bubbles: true }));
-  for (const [selector, value] of [['#installed-fonts', 'Consolas'], ['input[min="8"]', '16'], ['input[min="50"]', '125']]) {
-    const input = fixture.nativeElement.querySelector(selector) as HTMLInputElement | HTMLSelectElement;
+  for (const [selector, value] of [
+    ['#installed-fonts', 'Consolas'],
+    ['input[min="8"]', '16'],
+    ['input[min="50"]', '125'],
+  ]) {
+    const input = fixture.nativeElement.querySelector(selector) as
+      HTMLInputElement | HTMLSelectElement;
     input.value = value;
     input.dispatchEvent(new Event('change', { bubbles: true }));
     await fixture.whenStable();
@@ -440,48 +811,83 @@ test('changed settings are saved and restored before the first terminal opens af
   await click('Nord');
   const saved = localStorage.getItem('tiii-terminal-settings');
   expect(saved).not.toBeNull();
-  expect(JSON.parse(saved!)).toEqual({ theme: 'Nord', profileId: 'powershell', fontFamily: 'Consolas', fontSize: 16, scale: 125, backgroundOpacity: 100 });
+  expect(JSON.parse(saved!)).toEqual({
+    theme: 'Nord',
+    profileId: 'powershell',
+    fontFamily: 'Consolas',
+    fontSize: 16,
+    scale: 125,
+    backgroundOpacity: 100,
+  });
   await restartApp();
   expect(fixture.componentInstance.tabs()[0].profileId).toBe('pwsh');
   expect(fixture.componentInstance.selectedProfile()?.id).toBe('powershell');
   expect(fixture.componentInstance.scale()).toBe(125);
   expect(windowActions).toEqual(['zoom', 'zoom']);
-  expect(terminals[0].options).toMatchObject({ theme: { ...themes.Nord, background: '#00000000' }, fontFamily: '"Consolas"', fontSize: 16 });
+  expect(terminals[0].options).toMatchObject({
+    theme: { ...themes.Nord, background: '#00000000' },
+    fontFamily: '"Consolas"',
+    fontSize: 16,
+  });
   expect(localStorage.getItem('tiii-terminal-settings')).toBe(saved);
 });
 
-test.each(['windows', 'macos'])('%s acrylic opacity changes the background without fading terminal text and survives restart', async (platform: string): Promise<void> => {
-  nativePlatform = platform;
-  fixture.componentInstance.platform.set(platform);
-  await click('Settings');
-  const input = fixture.nativeElement.querySelector('input[aria-label="Acrylic opacity"]') as HTMLInputElement;
-  input.value = '65';
-  input.dispatchEvent(new Event('input', { bubbles: true }));
-  await fixture.whenStable();
-  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-opacity')).toBe('65%');
-  expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
-  expect(terminals[0].options.theme?.foreground).toBe(themes.TIII.foreground);
-  await restartApp();
-  expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
-  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-opacity')).toBe('65%');
-  expect(terminals[0].options.theme?.background).toBe('#00000000');
-});
+test.each(['windows', 'macos'])(
+  '%s acrylic opacity changes the background without fading terminal text and survives restart',
+  async (platform: string): Promise<void> => {
+    nativePlatform = platform;
+    fixture.componentInstance.platform.set(platform);
+    await click('Settings');
+    const input = fixture.nativeElement.querySelector(
+      'input[aria-label="Acrylic opacity"]',
+    ) as HTMLInputElement;
+    input.value = '65';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await fixture.whenStable();
+    expect(
+      fixture.nativeElement
+        .querySelector('.shell')
+        .style.getPropertyValue('--terminal-opacity'),
+    ).toBe('65%');
+    expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
+    expect(terminals[0].options.theme?.foreground).toBe(themes.TIII.foreground);
+    await restartApp();
+    expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
+    expect(
+      fixture.nativeElement
+        .querySelector('.shell')
+        .style.getPropertyValue('--terminal-opacity'),
+    ).toBe('65%');
+    expect(terminals[0].options.theme?.background).toBe('#00000000');
+  },
+);
 
 test('Linux opaque windows preserve the theme color without losing the saved opacity preference', async (): Promise<void> => {
   await click('Settings');
-  const input = fixture.nativeElement.querySelector('input[aria-label="Acrylic opacity"]') as HTMLInputElement;
+  const input = fixture.nativeElement.querySelector(
+    'input[aria-label="Acrylic opacity"]',
+  ) as HTMLInputElement;
   input.value = '65';
   input.dispatchEvent(new Event('input', { bubbles: true }));
   await fixture.whenStable();
   nativePlatform = 'linux';
   await restartApp();
-  expect(fixture.nativeElement.querySelector('.shell').style.getPropertyValue('--terminal-opacity')).toBe('100%');
+  expect(
+    fixture.nativeElement
+      .querySelector('.shell')
+      .style.getPropertyValue('--terminal-opacity'),
+  ).toBe('100%');
   expect(fixture.componentInstance.backgroundOpacity()).toBe(65);
   await click('Settings');
-  const restored = fixture.nativeElement.querySelector('input[aria-label="Acrylic opacity"]') as HTMLInputElement;
+  const restored = fixture.nativeElement.querySelector(
+    'input[aria-label="Acrylic opacity"]',
+  ) as HTMLInputElement;
   expect(restored.disabled).toBe(true);
   expect(restored.value).toBe('100');
-  expect(JSON.parse(localStorage.getItem('tiii-terminal-settings')!).backgroundOpacity).toBe(65);
+  expect(
+    JSON.parse(localStorage.getItem('tiii-terminal-settings')!)
+      .backgroundOpacity,
+  ).toBe(65);
 });
 
 test('tabs restore their order, uploaded icons, groups, shell profiles, and active selection after restart', async (): Promise<void> => {
@@ -492,7 +898,9 @@ test('tabs restore their order, uploaded icons, groups, shell profiles, and acti
   app.createGroup(first.id);
   app.setGroupColor('#75d8b1');
   await fixture.whenStable();
-  const input = fixture.nativeElement.querySelector('.dialog--group input') as HTMLInputElement;
+  const input = fixture.nativeElement.querySelector(
+    '.dialog--group input',
+  ) as HTMLInputElement;
   input.value = 'Work';
   input.dispatchEvent(new Event('change', { bubbles: true }));
   app.groupDialog.nativeElement.close();
@@ -512,7 +920,9 @@ test('tabs restore their order, uploaded icons, groups, shell profiles, and acti
   expect(fixture.componentInstance.groups()).toEqual(groups);
   expect(fixture.componentInstance.activeId()).toBe(first.id);
   expect(fixture.nativeElement.querySelectorAll('.tab').length).toBe(2);
-  expect(fixture.nativeElement.querySelector('img.tab__icon').getAttribute('src')).toBe(tabs[1].icon);
+  expect(
+    fixture.nativeElement.querySelector('img.tab__icon').getAttribute('src'),
+  ).toBe(tabs[1].icon);
   expect(terminals.length).toBe(2);
   expect(localStorage.getItem('tiii-terminal-tabs')).toBe(saved);
 });
@@ -520,7 +930,9 @@ test('tabs restore their order, uploaded icons, groups, shell profiles, and acti
 test('closing the last tab stores an empty layout and the next startup opens one new tab', async (): Promise<void> => {
   const id = fixture.componentInstance.tabs()[0].id;
   await fixture.componentInstance.closeTab(id);
-  expect(JSON.parse(localStorage.getItem('tiii-terminal-tabs')!).tabs).toEqual([]);
+  expect(JSON.parse(localStorage.getItem('tiii-terminal-tabs')!).tabs).toEqual(
+    [],
+  );
   await restartApp();
   expect(fixture.componentInstance.tabs().length).toBe(1);
   expect(fixture.componentInstance.tabs()[0].id).not.toBe(id);
@@ -528,29 +940,42 @@ test('closing the last tab stores an empty layout and the next startup opens one
 
 test('renamed and recolored groups collapse their inactive tabs', async (): Promise<void> => {
   await click('New terminal tab');
-  fixture.nativeElement.querySelector('.tab').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+  fixture.nativeElement
+    .querySelector('.tab')
+    .dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, cancelable: true }),
+    );
   await fixture.whenStable();
   await click('Add tab to new group');
-  const input = fixture.nativeElement.querySelector('.dialog--group input') as HTMLInputElement;
+  const input = fixture.nativeElement.querySelector(
+    '.dialog--group input',
+  ) as HTMLInputElement;
   input.value = 'Work';
   input.dispatchEvent(new Event('change', { bubbles: true }));
   await fixture.whenStable();
   await click('Green');
   await click('Close group settings');
-  const label = fixture.nativeElement.querySelector('.group_label') as HTMLButtonElement;
+  const label = fixture.nativeElement.querySelector(
+    '.group_label',
+  ) as HTMLButtonElement;
   expect(label.textContent.trim()).toBe('Work');
   expect(label.style.getPropertyValue('--group-color')).toBe('#75d8b1');
   await click('Work');
-  expect(fixture.nativeElement.querySelector('.tab[hidden] .tab__select').textContent.trim()).toBe('2');
+  expect(
+    fixture.nativeElement
+      .querySelector('.tab[hidden] .tab__select')
+      .textContent.trim(),
+  ).toBe('2');
 });
-
 
 test('Linux directory changes persist per tab and are passed back to the shell on restart', async (): Promise<void> => {
   const id = fixture.componentInstance.tabs()[0].id;
   const directory = '/home/user/Projects/space and ünicode';
   eventListeners.get('terminal-directory')!({ payload: { id, directory } });
   await fixture.whenStable();
-  expect(JSON.parse(localStorage.getItem('tiii-terminal-tabs')!).tabs[0].directory).toBe(directory);
+  expect(
+    JSON.parse(localStorage.getItem('tiii-terminal-tabs')!).tabs[0].directory,
+  ).toBe(directory);
   await restartApp();
   expect(openedDirectories.at(-1)).toBe(directory);
 });

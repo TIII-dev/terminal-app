@@ -1,4 +1,16 @@
-import { AfterViewInit, ChangeDetectionStrategy, Component, ElementRef, OnDestroy, PendingTasks, ViewChild, computed, effect, inject, signal } from '@angular/core';
+import {
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  OnDestroy,
+  PendingTasks,
+  ViewChild,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
@@ -14,23 +26,46 @@ import { parseTerminalSession } from './terminal-session/terminal-session.utils'
 import { tabIcons } from './terminal-tab/terminal-tab.constants';
 import { readTabImage } from './terminal-tab/terminal-tab.image';
 import { TabGroup, TerminalTab } from './terminal-tab/terminal-tab.types';
-import { getTabIcon, getTabShortcut, moveTabToGroup, reorderTab } from './terminal-tab/terminal-tab.utils';
+import {
+  getTabIcon,
+  getTabShortcut,
+  moveTabToGroup,
+  reorderTab,
+} from './terminal-tab/terminal-tab.utils';
 
-@Component({ selector: 'app-root', standalone: true, changeDetection: ChangeDetectionStrategy.OnPush, templateUrl: './app.component.html', styleUrl: './app.component.css' })
+@Component({
+  selector: 'app-root',
+  standalone: true,
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './app.component.html',
+  styleUrl: './app.component.css',
+})
 export class AppComponent implements AfterViewInit, OnDestroy {
   @ViewChild('terminalHost', { static: true }) host!: ElementRef<HTMLElement>;
   @ViewChild('tabList', { static: true }) tabList!: ElementRef<HTMLElement>;
-  @ViewChild('settingsDialog', { static: true }) settingsDialog!: ElementRef<HTMLDialogElement>;
-  @ViewChild('aboutDialog', { static: true }) aboutDialog!: ElementRef<HTMLDialogElement>;
-  @ViewChild('groupDialog', { static: true }) groupDialog!: ElementRef<HTMLDialogElement>;
-  @ViewChild('iconDialog', { static: true }) iconDialog!: ElementRef<HTMLDialogElement>;
-  @ViewChild('appMenu', { static: true }) appMenu!: ElementRef<HTMLDetailsElement>;
+  @ViewChild('settingsDialog', { static: true })
+  settingsDialog!: ElementRef<HTMLDialogElement>;
+  @ViewChild('aboutDialog', { static: true })
+  aboutDialog!: ElementRef<HTMLDialogElement>;
+  @ViewChild('groupDialog', { static: true })
+  groupDialog!: ElementRef<HTMLDialogElement>;
+  @ViewChild('iconDialog', { static: true })
+  iconDialog!: ElementRef<HTMLDialogElement>;
+  @ViewChild('appMenu', { static: true })
+  appMenu!: ElementRef<HTMLDetailsElement>;
   readonly themes = themes;
   readonly tabIcons = tabIcons;
   readonly iconError = signal('');
   private editingIconId = '';
   readonly themeNames = Object.keys(themes) as (keyof typeof themes)[];
-  readonly groupColors = [{ name: 'Purple', value: '#b79aff' }, { name: 'Blue', value: '#78b6ff' }, { name: 'Green', value: '#75d8b1' }, { name: 'Yellow', value: '#f0c674' }, { name: 'Pink', value: '#f38ba8' }, { name: 'Gray', value: '#9ba5b7' }];
+  readonly groupColors = [
+    { name: 'Purple', value: '#b79aff' },
+    { name: 'Blue', value: '#78b6ff' },
+    { name: 'Green', value: '#75d8b1' },
+    { name: 'Yellow', value: '#f0c674' },
+    { name: 'Pink', value: '#f38ba8' },
+    { name: 'Gray', value: '#9ba5b7' },
+  ];
   readonly theme = signal<keyof typeof themes>('TIII');
   readonly tabs = signal<TerminalTab[]>([]);
   readonly groups = signal<TabGroup[]>([]);
@@ -48,30 +83,47 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   readonly fontSize = signal(13);
   readonly scale = signal(100);
   readonly backgroundOpacity = signal(100);
-  readonly effectiveBackgroundOpacity = computed((): number => this.platform() === 'linux' ? 100 : this.backgroundOpacity());
+  readonly effectiveBackgroundOpacity = computed((): number =>
+    this.platform() === 'linux' ? 100 : this.backgroundOpacity(),
+  );
   readonly fontError = signal<string | undefined>(undefined);
   readonly tabMenu = signal<TabMenu | undefined>(undefined);
-  readonly terminalMenu = signal<{ tabId: string; x: number; y: number; hasSelection: boolean } | undefined>(undefined);
+  readonly terminalMenu = signal<
+    { tabId: string; x: number; y: number; hasSelection: boolean } | undefined
+  >(undefined);
   readonly clipboardError = signal('');
   private readonly editingGroupId = signal<string | undefined>(undefined);
-  readonly editingGroup = computed((): TabGroup | undefined => this.groups().find((group): boolean => group.id === this.editingGroupId()));
+  readonly editingGroup = computed((): TabGroup | undefined =>
+    this.groups().find((group): boolean => group.id === this.editingGroupId()),
+  );
   private nextGroup = 1;
   private readonly hasRestoredTabs = signal(false);
-  private readonly persistTabs = effect((): void => { if (this.hasRestoredTabs()) this.saveTabs(); });
+  private readonly persistTabs = effect((): void => {
+    if (this.hasRestoredTabs()) this.saveTabs();
+  });
   private unlisten?: UnlistenFn;
   private unlistenDirectory?: UnlistenFn;
   private readonly appWindow = getCurrentWindow();
   private readonly pendingTasks = inject(PendingTasks);
-  private readonly instances = new Map<string, { terminal: Terminal; fit: FitAddon }>();
+  private readonly instances = new Map<
+    string,
+    { terminal: Terminal; fit: FitAddon }
+  >();
   private readonly openingTabs = new Map<string, Promise<void>>();
-  private readonly resizeObserver = new ResizeObserver(() => { const instance = this.instances.get(this.activeId()); if (instance) this.fitTerminal(instance); });
+  private readonly resizeObserver = new ResizeObserver(() => {
+    const instance = this.instances.get(this.activeId());
+    if (instance) this.fitTerminal(instance);
+  });
   readonly minimizeWindow = (): Promise<void> => this.appWindow.minimize();
   readonly closeWindow = (): Promise<void> => {
     if (this.hasRestoredTabs()) this.saveTabs();
     return this.appWindow.close();
   };
   readonly maximizeWindow = async (): Promise<void> => {
-    if (this.platform() === 'macos') await this.appWindow.setFullscreen(!await this.appWindow.isFullscreen());
+    if (this.platform() === 'macos')
+      await this.appWindow.setFullscreen(
+        !(await this.appWindow.isFullscreen()),
+      );
     else await this.appWindow.toggleMaximize();
   };
 
@@ -79,16 +131,40 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     const finish = this.pendingTasks.add();
     try {
       this.platform.set(await invoke<string>('get_platform'));
-      const [profiles, version] = await Promise.all([invoke<ShellProfile[]>('get_profiles'), getVersion()]);
+      const [profiles, version] = await Promise.all([
+        invoke<ShellProfile[]>('get_profiles'),
+        getVersion(),
+      ]);
       this.profiles.set(profiles);
       this.version.set(version);
-      this.selectedProfile.set(this.profiles().find((profile): boolean => profile.isDefault));
-      if (!this.selectedProfile()) throw new Error('No default shell profile found - check your installed shells');
+      this.selectedProfile.set(
+        this.profiles().find((profile): boolean => profile.isDefault),
+      );
+      if (!this.selectedProfile())
+        throw new Error(
+          'No default shell profile found - check your installed shells',
+        );
       await this.restoreSettings();
-      this.unlisten = await listen<OutputEvent>('terminal-output', ({ payload }): void => { this.instances.get(payload.id)?.terminal.write(new Uint8Array(payload.data)); });
-      this.unlistenDirectory = await listen<{ id: string; directory: string }>('terminal-directory', ({ payload }): void => {
-        this.tabs.update((tabs): TerminalTab[] => tabs.map((tab): TerminalTab => tab.id === payload.id ? { ...tab, directory: payload.directory } : tab));
-      });
+      this.unlisten = await listen<OutputEvent>(
+        'terminal-output',
+        ({ payload }): void => {
+          this.instances
+            .get(payload.id)
+            ?.terminal.write(new Uint8Array(payload.data));
+        },
+      );
+      this.unlistenDirectory = await listen<{ id: string; directory: string }>(
+        'terminal-directory',
+        ({ payload }): void => {
+          this.tabs.update((tabs): TerminalTab[] =>
+            tabs.map((tab): TerminalTab =>
+              tab.id === payload.id
+                ? { ...tab, directory: payload.directory }
+                : tab,
+            ),
+          );
+        },
+      );
       this.resizeObserver.observe(this.host.nativeElement);
       window.addEventListener('keydown', this.handleShortcut, true);
       document.addEventListener('pointerdown', this.dismissTabMenu);
@@ -97,23 +173,42 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     } catch (error: unknown) {
       this.startupError.set(`Could not start terminal: ${String(error)}`);
       throw error;
-    } finally { finish(); }
+    } finally {
+      finish();
+    }
   }
 
   async addTab(groupId: string | null = null): Promise<void> {
     const profile = this.selectedProfile();
-    if (!profile) throw new Error('No shell profile selected - choose a profile in Settings');
-    const tab: TerminalTab = { id: crypto.randomUUID(), icon: getTabIcon(this.tabs(), crypto.getRandomValues(new Uint32Array(1))[0]), profileId: profile.id, profileName: profile.name, groupId };
+    if (!profile)
+      throw new Error(
+        'No shell profile selected - choose a profile in Settings',
+      );
+    const tab: TerminalTab = {
+      id: crypto.randomUUID(),
+      icon: getTabIcon(
+        this.tabs(),
+        crypto.getRandomValues(new Uint32Array(1))[0],
+      ),
+      profileId: profile.id,
+      profileName: profile.name,
+      groupId,
+    };
     await this.openTab(tab);
   }
 
   private async openTab(tab: TerminalTab): Promise<void> {
     this.tabs.set([...this.tabs(), tab]);
-    if (tab.groupId) this.tabs.set(moveTabToGroup(this.tabs(), tab.id, tab.groupId));
+    if (tab.groupId)
+      this.tabs.set(moveTabToGroup(this.tabs(), tab.id, tab.groupId));
     this.activeId.set(tab.id);
     const opening = this.mount(tab);
     this.openingTabs.set(tab.id, opening);
-    try { await opening; } finally { this.openingTabs.delete(tab.id); }
+    try {
+      await opening;
+    } finally {
+      this.openingTabs.delete(tab.id);
+    }
     this.scrollActiveTab();
   }
 
@@ -139,10 +234,19 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       this.instances.delete(id);
       this.tabs.set(this.tabs().filter((tab): boolean => tab.id !== id));
       this.removeEmptyGroups();
-      if (!this.tabs().length) { this.activeId.set(''); await this.closeWindow(); return; }
-      if (this.activeId() === id) this.activate(this.tabs()[Math.min(index, this.tabs().length - 1)]);
+      if (!this.tabs().length) {
+        this.activeId.set('');
+        await this.closeWindow();
+        return;
+      }
+      if (this.activeId() === id)
+        this.activate(this.tabs()[Math.min(index, this.tabs().length - 1)]);
       else this.instances.get(this.activeId())?.terminal.focus();
-    } finally { this.closingIds.update((ids): string[] => ids.filter((closingId): boolean => closingId !== id)); }
+    } finally {
+      this.closingIds.update((ids): string[] =>
+        ids.filter((closingId): boolean => closingId !== id),
+      );
+    }
   }
 
   async reopenTab(): Promise<void> {
@@ -150,23 +254,44 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     if (!previous) return;
     this.closedTabs.update((tabs): TerminalTab[] => tabs.slice(0, -1));
     // shortcut: reopening starts a fresh shell; add session persistence when process restoration is required.
-    const icon = this.tabs().some((tab): boolean => tab.icon === previous.icon) ? getTabIcon(this.tabs(), crypto.getRandomValues(new Uint32Array(1))[0]) : previous.icon;
-    const tab = { ...previous, id: crypto.randomUUID(), icon, groupId: this.groups().some((group): boolean => group.id === previous.groupId) ? previous.groupId : null };
+    const icon = this.tabs().some((tab): boolean => tab.icon === previous.icon)
+      ? getTabIcon(this.tabs(), crypto.getRandomValues(new Uint32Array(1))[0])
+      : previous.icon;
+    const tab = {
+      ...previous,
+      id: crypto.randomUUID(),
+      icon,
+      groupId: this.groups().some(
+        (group): boolean => group.id === previous.groupId,
+      )
+        ? previous.groupId
+        : null,
+    };
     await this.openTab(tab);
   }
 
   cycleTab(direction: number): void {
     if (!this.tabs().length) return;
-    const index = this.tabs().findIndex((tab): boolean => tab.id === this.activeId());
-    this.activate(this.tabs()[(index + direction + this.tabs().length) % this.tabs().length]);
+    const index = this.tabs().findIndex(
+      (tab): boolean => tab.id === this.activeId(),
+    );
+    this.activate(
+      this.tabs()[
+        (index + direction + this.tabs().length) % this.tabs().length
+      ],
+    );
   }
 
   moveActiveTab(direction: number): void {
-    const index = this.tabs().findIndex((tab): boolean => tab.id === this.activeId());
+    const index = this.tabs().findIndex(
+      (tab): boolean => tab.id === this.activeId(),
+    );
     const target = index + direction;
     if (target < 0 || target >= this.tabs().length) return;
     const tab = { ...this.tabs()[index], groupId: this.tabs()[target].groupId };
-    const reordered = this.tabs().filter((candidate): boolean => candidate.id !== tab.id);
+    const reordered = this.tabs().filter(
+      (candidate): boolean => candidate.id !== tab.id,
+    );
     reordered.splice(target, 0, tab);
     this.tabs.set(reordered);
     this.removeEmptyGroups();
@@ -174,23 +299,42 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   }
 
   readonly handleShortcut = async (event: KeyboardEvent): Promise<void> => {
-    if (this.settingsDialog.nativeElement.open || this.aboutDialog.nativeElement.open || this.groupDialog.nativeElement.open || this.iconDialog.nativeElement.open) return;
-    if (this.platform() === 'linux' && event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey
-      && ['c', 'v'].includes(event.key.toLowerCase()) && event.target instanceof Node && this.host.nativeElement.contains(event.target)) {
+    if (
+      this.settingsDialog.nativeElement.open ||
+      this.aboutDialog.nativeElement.open ||
+      this.groupDialog.nativeElement.open ||
+      this.iconDialog.nativeElement.open
+    )
+      return;
+    if (
+      this.platform() === 'linux' &&
+      event.ctrlKey &&
+      event.shiftKey &&
+      !event.altKey &&
+      !event.metaKey &&
+      ['c', 'v'].includes(event.key.toLowerCase()) &&
+      event.target instanceof Node &&
+      this.host.nativeElement.contains(event.target)
+    ) {
       event.preventDefault();
       event.stopPropagation();
       if (event.repeat) return;
       const terminal = this.instances.get(this.activeId())?.terminal;
       if (!terminal) return;
       if (event.key.toLowerCase() === 'c') {
-        if (terminal.hasSelection()) await invoke('write_clipboard', { text: terminal.getSelection() });
+        if (terminal.hasSelection())
+          await invoke('write_clipboard', { text: terminal.getSelection() });
       } else {
         const text = await invoke<string>('read_clipboard');
-        if (this.instances.get(this.activeId())?.terminal === terminal) terminal.paste(text);
+        if (this.instances.get(this.activeId())?.terminal === terminal)
+          terminal.paste(text);
       }
       return;
     }
-    if (event.key === 'Escape' && (this.tabMenu() || this.terminalMenu() || this.appMenu.nativeElement.open)) {
+    if (
+      event.key === 'Escape' &&
+      (this.tabMenu() || this.terminalMenu() || this.appMenu.nativeElement.open)
+    ) {
       this.terminalMenu.set(undefined);
       this.tabMenu.set(undefined);
       this.appMenu.nativeElement.open = false;
@@ -204,14 +348,30 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     event.preventDefault();
     event.stopPropagation();
     switch (shortcut.action) {
-      case 'new': await this.addTab(); break;
-      case 'close': if (this.activeId()) await this.closeTab(this.activeId()); break;
-      case 'reopen': await this.reopenTab(); break;
-      case 'close-window': await this.closeWindow(); break;
-      case 'next': this.cycleTab(1); break;
-      case 'previous': this.cycleTab(-1); break;
-      case 'move-left': this.moveActiveTab(-1); break;
-      case 'move-right': this.moveActiveTab(1); break;
+      case 'new':
+        await this.addTab();
+        break;
+      case 'close':
+        if (this.activeId()) await this.closeTab(this.activeId());
+        break;
+      case 'reopen':
+        await this.reopenTab();
+        break;
+      case 'close-window':
+        await this.closeWindow();
+        break;
+      case 'next':
+        this.cycleTab(1);
+        break;
+      case 'previous':
+        this.cycleTab(-1);
+        break;
+      case 'move-left':
+        this.moveActiveTab(-1);
+        break;
+      case 'move-right':
+        this.moveActiveTab(1);
+        break;
       case 'select': {
         const tab = this.tabs()[shortcut.index];
         if (tab) this.activate(tab);
@@ -220,13 +380,26 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   };
 
   handleTabKey(event: KeyboardEvent, tab: TerminalTab): void {
-    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Delete'].includes(event.key)) return;
+    if (
+      !['ArrowLeft', 'ArrowRight', 'Home', 'End', 'Delete'].includes(event.key)
+    )
+      return;
     event.preventDefault();
-    if (event.key === 'Delete') { void this.closeTab(tab.id); return; }
+    if (event.key === 'Delete') {
+      void this.closeTab(tab.id);
+      return;
+    }
     if (event.key === 'Home') this.activate(this.tabs()[0]);
-    else if (event.key === 'End') this.activate(this.tabs()[this.tabs().length - 1]);
+    else if (event.key === 'End')
+      this.activate(this.tabs()[this.tabs().length - 1]);
     else this.cycleTab(event.key === 'ArrowRight' ? 1 : -1);
-    requestAnimationFrame((): void => { this.tabList.nativeElement.querySelector<HTMLButtonElement>(`[data-tab-id="${this.activeId()}"] .tab__select`)?.focus(); });
+    requestAnimationFrame((): void => {
+      this.tabList.nativeElement
+        .querySelector<HTMLButtonElement>(
+          `[data-tab-id="${this.activeId()}"] .tab__select`,
+        )
+        ?.focus();
+    });
   }
 
   handleMiddleClick(event: MouseEvent, tab: TerminalTab): void {
@@ -238,14 +411,35 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   openTabMenu(event: MouseEvent, tab: TerminalTab): void {
     event.preventDefault();
     this.terminalMenu.set(undefined);
-    this.tabMenu.set({ tabId: tab.id, groupId: tab.groupId, x: Math.max(8, Math.min(event.clientX, window.innerWidth - 240)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 300)) });
-    requestAnimationFrame((): void => { document.querySelector<HTMLButtonElement>('.context_menu button')?.focus(); });
+    this.tabMenu.set({
+      tabId: tab.id,
+      groupId: tab.groupId,
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 240)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 300)),
+    });
+    requestAnimationFrame((): void => {
+      document
+        .querySelector<HTMLButtonElement>('.context_menu button')
+        ?.focus();
+    });
   }
 
   readonly dismissTabMenu = (event: PointerEvent): void => {
-    if (!(event.target instanceof Element) || !event.target.closest('.context_menu')) this.terminalMenu.set(undefined);
-    if (!(event.target instanceof Element) || !event.target.closest('.context_menu')) this.tabMenu.set(undefined);
-    if (!(event.target instanceof Element) || !event.target.closest('.app_menu')) this.appMenu.nativeElement.open = false;
+    if (
+      !(event.target instanceof Element) ||
+      !event.target.closest('.context_menu')
+    )
+      this.terminalMenu.set(undefined);
+    if (
+      !(event.target instanceof Element) ||
+      !event.target.closest('.context_menu')
+    )
+      this.tabMenu.set(undefined);
+    if (
+      !(event.target instanceof Element) ||
+      !event.target.closest('.app_menu')
+    )
+      this.appMenu.nativeElement.open = false;
   };
 
   openTerminalMenu(event: MouseEvent): void {
@@ -254,11 +448,24 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     event.preventDefault();
     this.tabMenu.set(undefined);
     this.clipboardError.set('');
-    this.terminalMenu.set({ tabId: this.activeId(), x: Math.max(8, Math.min(event.clientX, window.innerWidth - 240)), y: Math.max(8, Math.min(event.clientY, window.innerHeight - 240)), hasSelection: terminal.hasSelection() });
-    requestAnimationFrame((): void => { document.querySelector<HTMLButtonElement>('[aria-label="Terminal actions"] button:not(:disabled)')?.focus(); });
+    this.terminalMenu.set({
+      tabId: this.activeId(),
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 240)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 240)),
+      hasSelection: terminal.hasSelection(),
+    });
+    requestAnimationFrame((): void => {
+      document
+        .querySelector<HTMLButtonElement>(
+          '[aria-label="Terminal actions"] button:not(:disabled)',
+        )
+        ?.focus();
+    });
   }
 
-  async terminalAction(action: 'copy' | 'paste' | 'select-all' | 'clear'): Promise<void> {
+  async terminalAction(
+    action: 'copy' | 'paste' | 'select-all' | 'clear',
+  ): Promise<void> {
     const menu = this.terminalMenu();
     const terminal = menu && this.instances.get(menu.tabId)?.terminal;
     if (!terminal) return;
@@ -267,30 +474,47 @@ export class AppComponent implements AfterViewInit, OnDestroy {
         await invoke('write_clipboard', { text: terminal.getSelection() });
       } else if (action === 'paste') {
         const text = await invoke<string>('read_clipboard');
-        if (this.activeId() === menu.tabId && this.instances.get(menu.tabId)?.terminal === terminal) terminal.paste(text);
+        if (
+          this.activeId() === menu.tabId &&
+          this.instances.get(menu.tabId)?.terminal === terminal
+        )
+          terminal.paste(text);
       } else if (action === 'select-all') terminal.selectAll();
       else if (action === 'clear') terminal.clear();
       this.terminalMenu.set(undefined);
       this.focusTerminal();
     } catch (error: unknown) {
-      this.clipboardError.set(`Clipboard action failed: ${error instanceof Error ? error.message : String(error)}`);
+      this.clipboardError.set(
+        `Clipboard action failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
   openIconEditor(tabId: string): void {
-    if (!this.tabs().some((tab): boolean => tab.id === tabId)) throw new Error('Unknown tab - select an open terminal tab');
+    if (!this.tabs().some((tab): boolean => tab.id === tabId))
+      throw new Error('Unknown tab - select an open terminal tab');
     this.editingIconId = tabId;
     this.iconError.set('');
     this.tabMenu.set(undefined);
     this.iconDialog.nativeElement.showModal();
   }
 
-  isIconUsed(icon: string): boolean { return this.tabs().some((tab): boolean => tab.id !== this.editingIconId && tab.icon === icon); }
+  isIconUsed(icon: string): boolean {
+    return this.tabs().some(
+      (tab): boolean => tab.id !== this.editingIconId && tab.icon === icon,
+    );
+  }
 
   setTabIcon(icon: string): void {
-    if (!this.tabs().some((tab): boolean => tab.id === this.editingIconId)) throw new Error('Unknown tab - select an open terminal tab');
-    if (this.isIconUsed(icon)) throw new Error('Icon is already used - choose another icon');
-    this.tabs.update((tabs): TerminalTab[] => tabs.map((tab): TerminalTab => tab.id === this.editingIconId ? { ...tab, icon } : tab));
+    if (!this.tabs().some((tab): boolean => tab.id === this.editingIconId))
+      throw new Error('Unknown tab - select an open terminal tab');
+    if (this.isIconUsed(icon))
+      throw new Error('Icon is already used - choose another icon');
+    this.tabs.update((tabs): TerminalTab[] =>
+      tabs.map((tab): TerminalTab =>
+        tab.id === this.editingIconId ? { ...tab, icon } : tab,
+      ),
+    );
     this.iconDialog.nativeElement.close();
   }
 
@@ -302,28 +526,52 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     this.iconError.set('');
     try {
       const icon = await readTabImage(file);
-      if (this.editingIconId !== tabId || !this.iconDialog.nativeElement.open) return;
+      if (this.editingIconId !== tabId || !this.iconDialog.nativeElement.open)
+        return;
       this.setTabIcon(icon);
+    } catch (error: unknown) {
+      this.iconError.set(String(error));
+      throw error;
+    } finally {
+      input.value = '';
     }
-    catch (error: unknown) { this.iconError.set(String(error)); throw error; }
-    finally { input.value = ''; }
   }
 
   handleMenuKey(event: KeyboardEvent): void {
     if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const buttons = Array.from((event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
-    const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const buttons = Array.from(
+      (event.currentTarget as HTMLElement).querySelectorAll<HTMLButtonElement>(
+        'button:not(:disabled)',
+      ),
+    );
+    const current = buttons.indexOf(
+      document.activeElement as HTMLButtonElement,
+    );
     if (event.key === 'Home') buttons[0].focus();
     else if (event.key === 'End') buttons[buttons.length - 1].focus();
-    else buttons[(current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length].focus();
+    else
+      buttons[
+        (current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) %
+          buttons.length
+      ].focus();
   }
 
   handleSettingsKey(event: KeyboardEvent): void {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    this.settingsTab.set(event.key === 'Home' ? 'main' : event.key === 'End' ? 'theme' : this.settingsTab() === 'main' ? 'theme' : 'main');
-    this.settingsDialog.nativeElement.querySelector<HTMLButtonElement>(`#${this.settingsTab()}-settings-tab`)!.focus();
+    this.settingsTab.set(
+      event.key === 'Home'
+        ? 'main'
+        : event.key === 'End'
+          ? 'theme'
+          : this.settingsTab() === 'main'
+            ? 'theme'
+            : 'main',
+    );
+    this.settingsDialog.nativeElement
+      .querySelector<HTMLButtonElement>(`#${this.settingsTab()}-settings-tab`)!
+      .focus();
   }
 
   getGroup(id: string): TabGroup {
@@ -332,10 +580,22 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     return group;
   }
 
-  isTabHidden(tab: TerminalTab): boolean { return tab.groupId !== null && this.getGroup(tab.groupId).isCollapsed && tab.id !== this.activeId(); }
+  isTabHidden(tab: TerminalTab): boolean {
+    return (
+      tab.groupId !== null &&
+      this.getGroup(tab.groupId).isCollapsed &&
+      tab.id !== this.activeId()
+    );
+  }
 
   createGroup(tabId: string): void {
-    const group = { id: crypto.randomUUID(), name: `Group ${this.nextGroup++}`, color: this.groupColors[this.groups().length % this.groupColors.length].value, isCollapsed: false };
+    const group = {
+      id: crypto.randomUUID(),
+      name: `Group ${this.nextGroup++}`,
+      color:
+        this.groupColors[this.groups().length % this.groupColors.length].value,
+      isCollapsed: false,
+    };
     this.groups.set([...this.groups(), group]);
     this.tabs.set(moveTabToGroup(this.tabs(), tabId, group.id));
     this.removeEmptyGroups();
@@ -355,13 +615,22 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   }
 
   toggleGroup(id: string): void {
-    this.groups.update((groups): TabGroup[] => groups.map((group): TabGroup => group.id === id ? { ...group, isCollapsed: !group.isCollapsed } : group));
+    this.groups.update((groups): TabGroup[] =>
+      groups.map((group): TabGroup =>
+        group.id === id ? { ...group, isCollapsed: !group.isCollapsed } : group,
+      ),
+    );
   }
 
   setGroupColor(color: string): void {
     const group = this.editingGroup();
-    if (!group) throw new Error('No group selected - open a group to change its color');
-    this.groups.update((groups): TabGroup[] => groups.map((candidate): TabGroup => candidate.id === group.id ? { ...candidate, color } : candidate));
+    if (!group)
+      throw new Error('No group selected - open a group to change its color');
+    this.groups.update((groups): TabGroup[] =>
+      groups.map((candidate): TabGroup =>
+        candidate.id === group.id ? { ...candidate, color } : candidate,
+      ),
+    );
   }
 
   renameGroup(event: Event): void {
@@ -370,19 +639,31 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     input.setCustomValidity(name ? '' : 'Enter a group name');
     if (!input.reportValidity()) return;
     const group = this.editingGroup();
-    if (!group) throw new Error('No group selected - open a group to rename it');
-    this.groups.update((groups): TabGroup[] => groups.map((candidate): TabGroup => candidate.id === group.id ? { ...candidate, name } : candidate));
+    if (!group)
+      throw new Error('No group selected - open a group to rename it');
+    this.groups.update((groups): TabGroup[] =>
+      groups.map((candidate): TabGroup =>
+        candidate.id === group.id ? { ...candidate, name } : candidate,
+      ),
+    );
   }
 
   ungroup(group: TabGroup): void {
-    this.tabs.set(this.tabs().map((tab): TerminalTab => tab.groupId === group.id ? { ...tab, groupId: null } : tab));
+    this.tabs.set(
+      this.tabs().map((tab): TerminalTab =>
+        tab.groupId === group.id ? { ...tab, groupId: null } : tab,
+      ),
+    );
     this.removeEmptyGroups();
     this.groupDialog.nativeElement.close();
   }
 
   async closeGroup(group: TabGroup): Promise<void> {
     this.groupDialog.nativeElement.close();
-    for (const tab of this.tabs().filter((tab): boolean => tab.groupId === group.id)) await this.closeTab(tab.id);
+    for (const tab of this.tabs().filter(
+      (tab): boolean => tab.groupId === group.id,
+    ))
+      await this.closeTab(tab.id);
   }
 
   startTabDrag(event: DragEvent, tab: TerminalTab): void {
@@ -400,30 +681,51 @@ export class AppComponent implements AfterViewInit, OnDestroy {
   dropTab(event: DragEvent, target: TerminalTab): void {
     event.preventDefault();
     if (!event.dataTransfer?.types.includes('application/x-tiii-tab')) return;
-    this.tabs.set(reorderTab(this.tabs(), event.dataTransfer.getData('application/x-tiii-tab'), target.id));
+    this.tabs.set(
+      reorderTab(
+        this.tabs(),
+        event.dataTransfer.getData('application/x-tiii-tab'),
+        target.id,
+      ),
+    );
     this.removeEmptyGroups();
   }
 
   dropIntoGroup(event: DragEvent, group: TabGroup): void {
     event.preventDefault();
     if (!event.dataTransfer?.types.includes('application/x-tiii-tab')) return;
-    this.assignGroup(event.dataTransfer.getData('application/x-tiii-tab'), group.id);
+    this.assignGroup(
+      event.dataTransfer.getData('application/x-tiii-tab'),
+      group.id,
+    );
   }
 
   private removeEmptyGroups(): void {
-    this.groups.set(this.groups().filter((group): boolean => this.tabs().some((tab): boolean => tab.groupId === group.id)));
+    this.groups.set(
+      this.groups().filter((group): boolean =>
+        this.tabs().some((tab): boolean => tab.groupId === group.id),
+      ),
+    );
   }
 
   async openSettings(): Promise<void> {
     this.settingsDialog.nativeElement.showModal();
     if (this.fonts().length) return;
-    try { this.fonts.set(await invoke<string[]>('get_fonts')); }
-    catch (error: unknown) { this.fontError.set(`Could not detect fonts: ${String(error)}`); throw error; }
+    try {
+      this.fonts.set(await invoke<string[]>('get_fonts'));
+    } catch (error: unknown) {
+      this.fontError.set(`Could not detect fonts: ${String(error)}`);
+      throw error;
+    }
   }
 
   setProfile(event: Event): void {
-    const profile = this.profiles().find((profile): boolean => profile.id === (event.target as HTMLSelectElement).value);
-    if (!profile) throw new Error('Unknown shell profile - select an installed profile');
+    const profile = this.profiles().find(
+      (profile): boolean =>
+        profile.id === (event.target as HTMLSelectElement).value,
+    );
+    if (!profile)
+      throw new Error('Unknown shell profile - select an installed profile');
     this.selectedProfile.set(profile);
     this.saveSettings();
   }
@@ -439,7 +741,11 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   async setFont(event: Event): Promise<void> {
     const select = event.target as HTMLSelectElement;
-    select.setCustomValidity(select.value === 'monospace' || this.fonts().includes(select.value) ? '' : 'Choose an installed font from the list');
+    select.setCustomValidity(
+      select.value === 'monospace' || this.fonts().includes(select.value)
+        ? ''
+        : 'Choose an installed font from the list',
+    );
     if (!select.reportValidity()) return;
     this.fontFamily.set(select.value);
     await this.applyFont();
@@ -460,7 +766,8 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     const scale = input.valueAsNumber;
     await getCurrentWebview().setZoom(scale / 100);
     this.scale.set(scale);
-    const instance = this.instances.get(this.activeId()); if (instance) this.fitTerminal(instance);
+    const instance = this.instances.get(this.activeId());
+    if (instance) this.fitTerminal(instance);
     this.saveSettings();
   }
 
@@ -473,13 +780,24 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   private async restoreSettings(): Promise<void> {
     const stored = localStorage.getItem('tiii-terminal-settings');
-    if (stored === null) { this.saveSettings(); return; }
+    if (stored === null) {
+      this.saveSettings();
+      return;
+    }
     const settings = parseSettings(stored);
-    const profile = this.profiles().find((profile): boolean => profile.id === settings.profileId);
-    if (!profile) throw new Error('Saved shell profile is unavailable - reinstall the shell or reset saved settings');
+    const profile = this.profiles().find(
+      (profile): boolean => profile.id === settings.profileId,
+    );
+    if (!profile)
+      throw new Error(
+        'Saved shell profile is unavailable - reinstall the shell or reset saved settings',
+      );
     if (settings.fontFamily !== 'monospace') {
       this.fonts.set(await invoke<string[]>('get_fonts'));
-      if (!this.fonts().includes(settings.fontFamily)) throw new Error('Saved font is unavailable - reinstall the font or reset saved settings');
+      if (!this.fonts().includes(settings.fontFamily))
+        throw new Error(
+          'Saved font is unavailable - reinstall the font or reset saved settings',
+        );
     }
     this.selectedProfile.set(profile);
     this.theme.set(settings.theme);
@@ -493,50 +811,107 @@ export class AppComponent implements AfterViewInit, OnDestroy {
 
   private async restoreTabs(): Promise<void> {
     const stored = localStorage.getItem('tiii-terminal-tabs');
-    if (stored === null) { await this.addTab(); return; }
+    if (stored === null) {
+      await this.addTab();
+      return;
+    }
     const session = parseTerminalSession(stored);
-    if (session.tabs.some((tab): boolean => !this.profiles().some((profile): boolean => profile.id === tab.profileId))) {
-      throw new Error('Saved tab shell is unavailable - reinstall the shell or reset saved tabs');
+    if (
+      session.tabs.some(
+        (tab): boolean =>
+          !this.profiles().some(
+            (profile): boolean => profile.id === tab.profileId,
+          ),
+      )
+    ) {
+      throw new Error(
+        'Saved tab shell is unavailable - reinstall the shell or reset saved tabs',
+      );
     }
     this.groups.set(session.groups);
     this.nextGroup = session.nextGroup;
     this.tabs.set(session.tabs);
-    if (!session.tabs.length) { await this.addTab(); return; }
+    if (!session.tabs.length) {
+      await this.addTab();
+      return;
+    }
     for (const tab of session.tabs) {
       this.activeId.set(tab.id);
       await this.mount(tab);
     }
-    this.activate(session.tabs.find((tab): boolean => tab.id === session.activeId)!);
+    this.activate(
+      session.tabs.find((tab): boolean => tab.id === session.activeId)!,
+    );
   }
 
   private saveTabs(): void {
-    localStorage.setItem('tiii-terminal-tabs', JSON.stringify({ tabs: this.tabs(), groups: this.groups(), activeId: this.activeId(), nextGroup: this.nextGroup }));
+    localStorage.setItem(
+      'tiii-terminal-tabs',
+      JSON.stringify({
+        tabs: this.tabs(),
+        groups: this.groups(),
+        activeId: this.activeId(),
+        nextGroup: this.nextGroup,
+      }),
+    );
   }
 
   private saveSettings(): void {
     const profile = this.selectedProfile();
-    if (!profile) throw new Error('No shell profile selected - choose a profile before saving settings');
-    localStorage.setItem('tiii-terminal-settings', JSON.stringify({ theme: this.theme(), profileId: profile.id, fontFamily: this.fontFamily(), fontSize: this.fontSize(), scale: this.scale(), backgroundOpacity: this.backgroundOpacity() }));
+    if (!profile)
+      throw new Error(
+        'No shell profile selected - choose a profile before saving settings',
+      );
+    localStorage.setItem(
+      'tiii-terminal-settings',
+      JSON.stringify({
+        theme: this.theme(),
+        profileId: profile.id,
+        fontFamily: this.fontFamily(),
+        fontSize: this.fontSize(),
+        scale: this.scale(),
+        backgroundOpacity: this.backgroundOpacity(),
+      }),
+    );
   }
 
-  private get terminalFontFamily(): string { return this.fontFamily() === 'monospace' ? 'monospace' : JSON.stringify(this.fontFamily()); }
-  private get terminalTheme(): ITheme { return { ...this.themes[this.theme()], background: '#00000000' }; }
+  private get terminalFontFamily(): string {
+    return this.fontFamily() === 'monospace'
+      ? 'monospace'
+      : JSON.stringify(this.fontFamily());
+  }
+  private get terminalTheme(): ITheme {
+    return { ...this.themes[this.theme()], background: '#00000000' };
+  }
 
-  clearInputValidity(event: Event): void { (event.target as HTMLInputElement).setCustomValidity(''); }
+  clearInputValidity(event: Event): void {
+    (event.target as HTMLInputElement).setCustomValidity('');
+  }
 
-  focusTerminal(): void { this.instances.get(this.activeId())?.terminal.focus(); }
+  focusTerminal(): void {
+    this.instances.get(this.activeId())?.terminal.focus();
+  }
 
   private async applyFont(): Promise<void> {
-    await document.fonts.load(`${this.fontSize()}px ${this.terminalFontFamily}`);
+    await document.fonts.load(
+      `${this.fontSize()}px ${this.terminalFontFamily}`,
+    );
     for (const { terminal } of this.instances.values()) {
       terminal.options.fontFamily = this.terminalFontFamily;
       terminal.options.fontSize = this.fontSize();
     }
-    const instance = this.instances.get(this.activeId()); if (instance) this.fitTerminal(instance);
+    const instance = this.instances.get(this.activeId());
+    if (instance) this.fitTerminal(instance);
   }
 
   private async mount(tab: TerminalTab): Promise<void> {
-    const terminal = new Terminal({ theme: this.terminalTheme, allowTransparency: true, fontFamily: this.terminalFontFamily, fontSize: this.fontSize(), cursorBlink: true });
+    const terminal = new Terminal({
+      theme: this.terminalTheme,
+      allowTransparency: true,
+      fontFamily: this.terminalFontFamily,
+      fontSize: this.fontSize(),
+      cursorBlink: true,
+    });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
     this.instances.set(tab.id, { terminal, fit });
@@ -544,38 +919,73 @@ export class AppComponent implements AfterViewInit, OnDestroy {
     this.renderActive();
     this.fitTerminal({ terminal, fit });
     const { cols, rows } = terminal;
-    await invoke('open_terminal', { id: tab.id, cols, rows, profileId: tab.profileId, directory: tab.directory ?? null });
-    terminal.onData((data): void => { void invoke('write_terminal', { id: tab.id, data }); });
-    terminal.onResize((size): void => { void invoke('resize_terminal', { id: tab.id, cols: size.cols, rows: size.rows }); });
-    if (tab.id === this.activeId()) { this.fitTerminal({ terminal, fit }); terminal.focus(); }
+    await invoke('open_terminal', {
+      id: tab.id,
+      cols,
+      rows,
+      profileId: tab.profileId,
+      directory: tab.directory ?? null,
+    });
+    terminal.onData((data): void => {
+      void invoke('write_terminal', { id: tab.id, data });
+    });
+    terminal.onResize((size): void => {
+      void invoke('resize_terminal', {
+        id: tab.id,
+        cols: size.cols,
+        rows: size.rows,
+      });
+    });
+    if (tab.id === this.activeId()) {
+      this.fitTerminal({ terminal, fit });
+      terminal.focus();
+    }
   }
 
   // FitAddon can pick one row more than the host shows, because the measured cell height is
   // fractional while rows are drawn at whole pixels. Drop rows whose rendered bottom is past the
   // visible area of the terminal host.
-  private fitTerminal({ terminal, fit }: { terminal: Terminal; fit: FitAddon }): void {
+  private fitTerminal({
+    terminal,
+    fit,
+  }: {
+    terminal: Terminal;
+    fit: FitAddon;
+  }): void {
     fit.fit();
     const host = this.host.nativeElement;
     const rowsElement = terminal.element?.querySelector('.xterm-rows');
     const firstRow = rowsElement?.firstElementChild;
     const lastRow = rowsElement?.lastElementChild;
     if (!firstRow || !lastRow) return;
-    const visibleBottom = host.getBoundingClientRect().bottom - parseFloat(getComputedStyle(host).paddingBottom);
+    const visibleBottom =
+      host.getBoundingClientRect().bottom -
+      parseFloat(getComputedStyle(host).paddingBottom);
     const overflow = lastRow.getBoundingClientRect().bottom - visibleBottom;
     if (overflow <= 0) return;
     const rowHeight = firstRow.getBoundingClientRect().height;
     const extraRows = Math.ceil(overflow / rowHeight);
-    if (extraRows > 0 && terminal.rows - extraRows >= 1) terminal.resize(terminal.cols, terminal.rows - extraRows);
+    if (extraRows > 0 && terminal.rows - extraRows >= 1)
+      terminal.resize(terminal.cols, terminal.rows - extraRows);
   }
 
   private renderActive(): void {
-    for (const [id, { terminal }] of this.instances) terminal.element!.style.display = id === this.activeId() ? 'block' : 'none';
+    for (const [id, { terminal }] of this.instances)
+      terminal.element!.style.display =
+        id === this.activeId() ? 'block' : 'none';
     const instance = this.instances.get(this.activeId());
-    if (instance) { this.fitTerminal(instance); instance.terminal.focus(); }
+    if (instance) {
+      this.fitTerminal(instance);
+      instance.terminal.focus();
+    }
   }
 
   private scrollActiveTab(): void {
-    requestAnimationFrame((): void => { this.tabList.nativeElement.querySelector(`[data-tab-id="${this.activeId()}"]`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); });
+    requestAnimationFrame((): void => {
+      this.tabList.nativeElement
+        .querySelector(`[data-tab-id="${this.activeId()}"]`)
+        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
   }
 
   ngOnDestroy(): void {

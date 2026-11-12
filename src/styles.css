@@ -1,9 +1,46 @@
-@import '@xterm/xterm/css/xterm.css';
-.terminal_host .xterm { height:100%; }
-.terminal_host .xterm-viewport { background-color:transparent !important; overflow-y:auto !important; }
-.shell ::-webkit-scrollbar { width:6px; height:6px; }
-.shell ::-webkit-scrollbar-track,.shell ::-webkit-scrollbar-corner { background:transparent; }
-.shell ::-webkit-scrollbar-thumb { background:color-mix(in srgb,var(--terminal-fg) 45%,transparent); border-radius:6px; }
-.shell ::-webkit-scrollbar-thumb:hover,.shell ::-webkit-scrollbar-thumb:active { background:var(--terminal-scrollbar-hover); }
-@supports not selector(::-webkit-scrollbar) { .shell * { scrollbar-width:thin; scrollbar-color:var(--terminal-scrollbar-hover) transparent; } }
-* { box-sizing:border-box; }html,body { height:100%; margin:0; background:transparent; }body { font-family:Inter,ui-sans-serif,system-ui,sans-serif; }button,select { font:inherit; }
+@import "@xterm/xterm/css/xterm.css";
+.terminal_host .xterm {
+  height: 100%;
+}
+.terminal_host .xterm-viewport {
+  background-color: transparent !important;
+  overflow-y: auto !important;
+}
+.shell ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.shell ::-webkit-scrollbar-track,
+.shell ::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.shell ::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--terminal-fg) 45%, transparent);
+  border-radius: 6px;
+}
+.shell ::-webkit-scrollbar-thumb:hover,
+.shell ::-webkit-scrollbar-thumb:active {
+  background: var(--terminal-scrollbar-hover);
+}
+@supports not selector(::-webkit-scrollbar) {
+  .shell * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--terminal-scrollbar-hover) transparent;
+  }
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: transparent;
+}
+body {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+button,
+select {
+  font: inherit;
+}

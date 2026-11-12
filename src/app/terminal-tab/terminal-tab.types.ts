@@ -7,8 +7,23 @@ export type TerminalTab = {
   directory?: string;
 };
 
-export type TabGroup = { id: string; name: string; color: string; isCollapsed: boolean };
+export type TabGroup = {
+  id: string;
+  name: string;
+  color: string;
+  isCollapsed: boolean;
+};
 
 export type TabShortcut =
-  | { action: 'new' | 'close' | 'reopen' | 'next' | 'previous' | 'move-left' | 'move-right' | 'close-window' }
+  | {
+      action:
+        | 'new'
+        | 'close'
+        | 'reopen'
+        | 'next'
+        | 'previous'
+        | 'move-left'
+        | 'move-right'
+        | 'close-window';
+    }
   | { action: 'select'; index: number };
