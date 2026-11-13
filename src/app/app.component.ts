@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { invoke } from '@tauri-apps/api/core';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -911,6 +912,7 @@ export class AppComponent implements AfterViewInit, OnDestroy {
       fontFamily: this.terminalFontFamily,
       fontSize: this.fontSize(),
       cursorBlink: true,
+      linkHandler: { activate: (_event, uri): Promise<void> => openUrl(uri) },
     });
     const fit = new FitAddon();
     terminal.loadAddon(fit);
